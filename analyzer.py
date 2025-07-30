@@ -42,7 +42,7 @@ def analyze_fits_file(path):
                 return None
 
             flux_radius = sep.flux_radius(data_sub, objects['x'], objects['y'],
-                                         6.0 * np.ones(n_stars), 0.5, [0.5])[0]
+                                         6.0 * np.ones(n_stars), 0.5)[0]
             hfr = 2 * np.mean(flux_radius)
             a = objects['a']
             b = objects['b']
