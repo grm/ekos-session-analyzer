@@ -105,6 +105,13 @@ def generate_discord_summary(results):
     """Generate a Discord-friendly summary from the aggregated results."""
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
     lines = [f"**Nightly Imaging Summary**\n📅 {now}\n"]
+    
+    # Generate global summary
+    global_summary = generate_global_summary(results)
+    lines.append(global_summary)
+    lines.append("")  # Empty line for separation
+    
+    # Generate per-object summaries
     for (obj, filt), entries in results.items():
         n = len(entries)
         n_stars = [e["n_stars"] for e in entries]
@@ -117,6 +124,53 @@ def generate_discord_summary(results):
             f"   🔷 Eccentricity:   min {min(eccs):.2f} / max {max(eccs):.2f} / avg {np.mean(eccs):.2f}\n"
         )
     return "\n".join(lines)
+
+def generate_global_summary(results):
+    """Generate a global summary of the entire night's session."""
+    if not results:
+        return "🌙 No data available for this session."
+    
+    # Collect all data across all objects and filters
+    all_entries = []
+    total_frames = 0
+    objects_count = len(results)
+    
+    for (obj, filt), entries in results.items():
+        all_entries.extend(entries)
+        total_frames += len(entries)
+    
+    if not all_entries:
+        return "🌙 No valid data available for this session."
+    
+    # Calculate global statistics
+    all_n_stars = [e["n_stars"] for e in all_entries]
+    all_hfrs = [e["hfr"] for e in all_entries]
+    all_eccs = [e["eccentricity"] for e in all_entries]
+    
+    # Calculate weighted averages (weighted by number of stars)
+    total_stars = sum(all_n_stars)
+    weighted_hfr = sum(hfr * stars for hfr, stars in zip(all_hfrs, all_n_stars)) / total_stars if total_stars > 0 else 0
+    weighted_ecc = sum(ecc * stars for ecc, stars in zip(all_eccs, all_n_stars)) / total_stars if total_stars > 0 else 0
+    
+    # Get unique objects and filters
+    unique_objects = set(e["object"] for e in all_entries)
+    unique_filters = set(e["filter"] for e in all_entries)
+    
+    summary_lines = [
+        f"🌙 **Global Session Summary**",
+        f"📊 Total Frames: {total_frames}",
+        f"🎯 Objects: {len(unique_objects)} ({', '.join(sorted(unique_objects))})",
+        f"🔍 Filters: {len(unique_filters)} ({', '.join(sorted(unique_filters))})",
+        f"⭐ Total Stars Detected: {total_stars:,}",
+        f"",
+        f"📈 **Overall Statistics**",
+        f"   ⭐ Stars per frame: min {min(all_n_stars)} / max {max(all_n_stars)} / avg {np.mean(all_n_stars):.1f}",
+        f"   🔧 HFR: min {min(all_hfrs):.2f} / max {max(all_hfrs):.2f} / avg {np.mean(all_hfrs):.2f} (weighted: {weighted_hfr:.2f})",
+        f"   🔷 Eccentricity: min {min(all_eccs):.2f} / max {max(all_eccs):.2f} / avg {np.mean(all_eccs):.2f} (weighted: {weighted_ecc:.2f})",
+        f""
+    ]
+    
+    return "\n".join(summary_lines)
 
 def send_discord_webhook(webhook_url, message):
     """Send the summary message to the specified Discord webhook."""
