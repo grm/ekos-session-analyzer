@@ -23,7 +23,7 @@ def main():
         hours=config.get("hours", 24)
     )
     if not results:
-        print("No valid FITS files found in the given time window.")
+        print("🌙 No valid FITS files found in the given time window. No summary sent to Discord.")
         sys.exit(0)
 
     summary = generate_discord_summary(results)
