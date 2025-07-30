@@ -13,8 +13,10 @@ def load_config(path):
         logging.error(f"Error loading config: {e}")
         return None
 
-def setup_logging():
+def setup_logging(verbose=False):
+    """Set up logging. If verbose is True, set level to DEBUG, else INFO."""
+    level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(
-        level=logging.INFO,
+        level=level,
         format="%(asctime)s [%(levelname)s] %(message)s"
     )

@@ -9,9 +9,10 @@ from analyzer import analyze_folder, generate_discord_summary, send_discord_webh
 def main():
     parser = argparse.ArgumentParser(description="Analyze FITS files and send a Discord summary.")
     parser.add_argument("-c", "--config", required=True, help="Path to config YAML file")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose (debug) output")
     args = parser.parse_args()
 
-    setup_logging()
+    setup_logging(verbose=args.verbose)
     config = load_config(args.config)
     if not config:
         print("❌ Failed to load config.")

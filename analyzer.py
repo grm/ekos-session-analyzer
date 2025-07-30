@@ -76,8 +76,10 @@ def analyze_folder(folder, hours=24):
             try:
                 mtime = datetime.fromtimestamp(os.path.getmtime(fpath))
                 if mtime < cutoff:
+                    logging.debug(f"Skipping {fpath}: modification time {mtime} < cutoff {cutoff}")
                     continue
             except (OSError, ValueError):
+                logging.debug(f"Skipping {fpath}: invalid modification time")
                 continue  # skip files with invalid modification time
             
             # Then check DATE-OBS from FITS header for more precise filtering
@@ -86,10 +88,13 @@ def analyze_folder(folder, hours=24):
                     header = hdul[0].header
                     date_obs = parse_date_obs(header)
                     if not date_obs or date_obs < cutoff:
+                        logging.debug(f"Skipping {fpath}: DATE-OBS {date_obs} < cutoff {cutoff}")
                         continue
-            except Exception:
+            except Exception as e:
+                logging.debug(f"Skipping {fpath}: error reading FITS header: {e}")
                 continue  # skip unreadable files
 
+            logging.debug(f"Analyzing {fpath}")
             res = analyze_fits_file(fpath)
             if res:
                 key = (res["object"], res["filter"])
