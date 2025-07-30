@@ -71,6 +71,16 @@ def analyze_folder(folder, hours=24):
             if not is_fits_file(fname):
                 continue
             fpath = os.path.join(root, fname)
+            
+            # First filter by file modification time (faster than opening FITS)
+            try:
+                mtime = datetime.fromtimestamp(os.path.getmtime(fpath))
+                if mtime < cutoff:
+                    continue
+            except (OSError, ValueError):
+                continue  # skip files with invalid modification time
+            
+            # Then check DATE-OBS from FITS header for more precise filtering
             try:
                 with fits.open(fpath) as hdul:
                     header = hdul[0].header
