@@ -31,6 +31,9 @@ def analyze_fits_file(path):
             date_obs = parse_date_obs(header)
             obj = header.get("OBJECT", "Unknown")
             filt = header.get("FILTER", "Unknown")
+            
+            # Extract exposure time (try common header fields)
+            exp_time = header.get("EXPTIME", header.get("EXPOSURE", 0))
 
             # Background subtraction
             bkg = sep.Background(data)
@@ -54,7 +57,8 @@ def analyze_fits_file(path):
                 "date_obs": date_obs,
                 "n_stars": n_stars,
                 "hfr": hfr,
-                "eccentricity": eccentricity
+                "eccentricity": eccentricity,
+                "exp_time": exp_time
             }
     except Exception as e:
         logging.warning(f"Error processing {path}: {e}")
@@ -117,8 +121,18 @@ def generate_discord_summary(results):
         n_stars = [e["n_stars"] for e in entries]
         hfrs = [e["hfr"] for e in entries]
         eccs = [e["eccentricity"] for e in entries]
+        total_exp_time = sum(e["exp_time"] for e in entries)
+        
+        # Format exposure time
+        if total_exp_time >= 3600:  # More than 1 hour
+            exp_time_str = f"{total_exp_time/3600:.1f}h"
+        elif total_exp_time >= 60:  # More than 1 minute
+            exp_time_str = f"{total_exp_time/60:.0f}m"
+        else:
+            exp_time_str = f"{total_exp_time:.0f}s"
+            
         lines.append(
-            f"📌 {obj} - {filt} ({n} frames)\n"
+            f"📌 {obj} - {filt} ({n} frames, {exp_time_str})\n"
             f"   ⭐ Stars: min {min(n_stars)} / max {max(n_stars)} / avg {np.mean(n_stars):.1f}  \n"
             f"   🔧 HFR:   min {min(hfrs):.2f} / max {max(hfrs):.2f} / avg {np.mean(hfrs):.2f}  \n"
             f"   🔷 Eccentricity:   min {min(eccs):.2f} / max {max(eccs):.2f} / avg {np.mean(eccs):.2f}\n"
@@ -146,6 +160,7 @@ def generate_global_summary(results):
     all_n_stars = [e["n_stars"] for e in all_entries]
     all_hfrs = [e["hfr"] for e in all_entries]
     all_eccs = [e["eccentricity"] for e in all_entries]
+    all_exp_times = [e["exp_time"] for e in all_entries]
     
     # Calculate weighted averages (weighted by number of stars)
     total_stars = sum(all_n_stars)
@@ -156,19 +171,59 @@ def generate_global_summary(results):
     unique_objects = set(e["object"] for e in all_entries)
     unique_filters = set(e["filter"] for e in all_entries)
     
+    # Calculate total integration time
+    total_integration = sum(all_exp_times)
+    
+    # Calculate integration time per filter
+    filter_integration = {}
+    for (obj, filt), entries in results.items():
+        if filt not in filter_integration:
+            filter_integration[filt] = 0
+        filter_integration[filt] += sum(e["exp_time"] for e in entries)
+    
+    # Format total integration time
+    if total_integration >= 3600:  # More than 1 hour
+        total_integration_str = f"{total_integration/3600:.1f}h"
+    elif total_integration >= 60:  # More than 1 minute
+        total_integration_str = f"{total_integration/60:.0f}m"
+    else:
+        total_integration_str = f"{total_integration:.0f}s"
+    
+    # Format integration time per filter
+    filter_integration_str = []
+    for filt in sorted(filter_integration.keys()):
+        exp_time = filter_integration[filt]
+        if exp_time >= 3600:
+            exp_str = f"{exp_time/3600:.1f}h"
+        elif exp_time >= 60:
+            exp_str = f"{exp_time/60:.0f}m"
+        else:
+            exp_str = f"{exp_time:.0f}s"
+        filter_integration_str.append(f"{filt}: {exp_str}")
+    
     summary_lines = [
         f"🌙 **Global Session Summary**",
         f"📊 Total Frames: {total_frames}",
+        f"⏱️ Total Integration: {total_integration_str}",
         f"🎯 Objects: {len(unique_objects)} ({', '.join(sorted(unique_objects))})",
         f"🔍 Filters: {len(unique_filters)} ({', '.join(sorted(unique_filters))})",
         f"⭐ Total Stars Detected: {total_stars:,}",
+        f"",
+        f"⏱️ **Integration Time per Filter**",
+    ]
+    
+    # Add integration time per filter
+    for filter_info in filter_integration_str:
+        summary_lines.append(f"   {filter_info}")
+    
+    summary_lines.extend([
         f"",
         f"📈 **Overall Statistics**",
         f"   ⭐ Stars per frame: min {min(all_n_stars)} / max {max(all_n_stars)} / avg {np.mean(all_n_stars):.1f}",
         f"   🔧 HFR: min {min(all_hfrs):.2f} / max {max(all_hfrs):.2f} / avg {np.mean(all_hfrs):.2f} (weighted: {weighted_hfr:.2f})",
         f"   🔷 Eccentricity: min {min(all_eccs):.2f} / max {max(all_eccs):.2f} / avg {np.mean(all_eccs):.2f} (weighted: {weighted_ecc:.2f})",
         f""
-    ]
+    ])
     
     return "\n".join(summary_lines)
 
