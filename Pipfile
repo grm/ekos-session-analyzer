@@ -1,0 +1,6 @@
+[packages]
+astropy = "*"
+sep = "*"
+numpy = "*"
+requests = "*"
+pyyaml= "*"
