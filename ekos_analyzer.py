@@ -89,10 +89,10 @@ class EkosAnalyzer:
                 
                 # Parse different event types
                 if event_type == 'AnalyzeStartTime':
-                    if len(parts) >= 3:
-                        # Format: AnalyzeStartTime,timestamp,datetime_str,timezone
-                        # Handle different datetime formats
-                        datetime_str = parts[2]
+                    if len(parts) >= 2:
+                        # Format: AnalyzeStartTime,datetime_str,timezone
+                        # parts[1] contains the actual datetime
+                        datetime_str = parts[1]
                         # Remove microseconds if present for parsing
                         if '.' in datetime_str:
                             datetime_str = datetime_str.split('.')[0]

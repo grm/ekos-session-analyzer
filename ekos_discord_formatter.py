@@ -480,10 +480,7 @@ def _format_session_overview(ekos_data: Dict[str, Any], advanced_metrics: Dict[s
             filters.add(filt)
         lines.append(f"🎯 Objects: {len(objects)} | 🔍 Filters: {len(filters)} ({', '.join(sorted(filters))})")
     
-    # Quality score for detailed reports
-    if detail_level in ['detailed', 'expert'] and advanced_metrics.get('quality_analysis'):
-        quality_score = advanced_metrics['quality_analysis'].get('quality_score', 0)
-        lines.append(f"⭐ Session Quality Score: {quality_score:.0f}/100")
+    # Quality score removed - was arbitrary and not actionable
     
     return "\n".join(lines)
 

@@ -3,11 +3,20 @@ Nightly Ekos Session Analyzer - CLI Entrypoint
 Specialized for Ekos/KStars analyze file support
 """
 import sys
+import os
 import argparse
 import logging
-from utils import load_config, setup_logging, send_discord_message
+from utils import load_config, setup_logging, send_discord_message, send_discord_message_with_image
 from ekos_analyzer import EkosAnalyzer
 from ekos_discord_formatter import generate_ekos_discord_summary, ADVANCED_METRICS_AVAILABLE
+
+# Try to import plotting functionality
+try:
+    from session_plotter import SessionPlotter
+    PLOTTING_AVAILABLE = True
+except ImportError as e:
+    PLOTTING_AVAILABLE = False
+    logging.debug(f"Plotting not available: {e}")
 
 def main():
     parser = argparse.ArgumentParser(description="Analyze Ekos sessions and send a Discord summary.")
@@ -68,12 +77,49 @@ def main():
         print(summary)
         print("="*50 + "\n")
         
+        # Generate session plot if enabled and available
+        plot_path = None
+        plot_enabled = config.get('plotting', {}).get('enabled', True)  # Default enabled
+        
+        if plot_enabled and PLOTTING_AVAILABLE:
+            try:
+                print("📈 Generating session plot...")
+                plotter = SessionPlotter(config)
+                plot_path = plotter.generate_session_plot(ekos_results)
+                
+                if plot_path:
+                    print(f"✅ Session plot generated: {plot_path}")
+                else:
+                    print("⚠️ Could not generate session plot")
+                    
+            except Exception as e:
+                logging.error(f"Error generating plot: {e}")
+                print(f"⚠️ Plot generation failed: {e}")
+        elif not PLOTTING_AVAILABLE and plot_enabled:
+            print("⚠️ Plotting requested but matplotlib not available")
+        
         # Send to Discord (unless dry-run)
         if args.dry_run:
             print("🧪 DRY-RUN MODE: Summary generated but not sent to Discord.")
+            if plot_path:
+                print(f"🧪 Plot would be sent: {plot_path}")
         else:
-            send_discord_message(webhook_url, summary)
-            print("✅ Summary sent to Discord.")
+            if plot_path:
+                send_discord_message_with_image(webhook_url, summary, plot_path)
+                print("✅ Summary and plot sent to Discord.")
+            else:
+                send_discord_message(webhook_url, summary)
+                print("✅ Summary sent to Discord.")
+        
+        # Clean up plot file after sending/dry-run
+        if plot_path and os.path.exists(plot_path):
+            try:
+                os.remove(plot_path)
+                logging.debug(f"Cleaned up plot file: {plot_path}")
+                if args.dry_run:
+                    print(f"🧹 Plot file cleaned up: {plot_path}")
+            except Exception as e:
+                logging.warning(f"Could not remove plot file {plot_path}: {e}")
         
     except Exception as e:
         logging.error(f"Analysis failed: {e}")
