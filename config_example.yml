@@ -1,3 +1,94 @@
-folder: "/path/to/your/fits/files"
-webhook: "https://discord.com/api/webhooks/..."
+# ====================================
+# ASTRO SESSION ANALYSER - SIMPLIFIED CONFIG
+# Configuration example with 3 simple levels
+# ====================================
+
+# Discord webhook URL for sending summaries
+webhook: "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN"
+
+# Time window in hours to look back for sessions
 hours: 24
+
+# Path to KStars/Ekos analyze files directory
+# Default: ~/.local/share/kstars/analyze
+analyze_dir: "/home/username/.local/share/kstars/analyze"
+
+# Basic log level (DEBUG, INFO, WARNING, ERROR)
+log_level: "INFO"
+
+# ====================================
+# REPORTING CONFIGURATION
+# ====================================
+
+# Discord report level: minimal, standard, detailed
+# - minimal: Ultra-quick notifications (3 lines max)
+# - standard: Current balanced format (default)
+# - detailed: Comprehensive analysis with correlations (requires numpy/scipy)
+discord_report_level: "standard"
+
+# ====================================
+# ADVANCED ANALYTICS (for detailed level only)
+# Requires: pip install numpy scipy
+# ====================================
+
+# Enable advanced analytics and metrics
+advanced_analytics:
+  enabled: false  # Set to true for detailed level
+  
+  # Statistical correlation analysis
+  correlation_analysis: true
+  
+  # Session efficiency calculations
+  efficiency_analysis: true
+  
+  # Performance scoring (0-100 scale)
+  performance_scoring: true
+
+# ====================================
+# ALERT THRESHOLDS
+# ====================================
+
+# Automatic alert thresholds
+alert_thresholds:
+  # HFR drift warning (pixels)
+  hfr_drift_warning: 0.5
+  
+  # Temperature swing warning (°C)
+  temperature_swing_warning: 5.0
+  
+  # Success rate warning (0.0-1.0)
+  success_rate_warning: 0.8
+  
+  # Minimum stars for quality warning
+  min_stars_warning: 100
+
+# ====================================
+# NOTIFICATION PREFERENCES
+# ====================================
+
+notifications:
+  # Send alerts for poor performance
+  performance_alerts: true
+  
+  # Send summary only if captures > threshold
+  min_captures_for_report: 1
+  
+  # Include quality score in reports (requires advanced_analytics)
+  include_quality_score: false
+
+# ====================================
+# CONFIGURATION EXAMPLES FOR DIFFERENT USERS
+# ====================================
+
+# For beginners (copy these settings):
+# discord_report_level: "standard"
+# advanced_analytics: { enabled: false }
+
+# For enthusiasts/data lovers (copy these settings):
+# discord_report_level: "detailed"
+# advanced_analytics: { enabled: true }
+
+# For monitoring/automation (copy these settings):
+# discord_report_level: "minimal"
+# advanced_analytics: { enabled: false }
+# notifications: { min_captures_for_report: 5 }

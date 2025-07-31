@@ -1,8 +1,9 @@
 """
-Utils for config loading and logging
+Utils for config loading, logging and Discord messaging
 """
 import yaml
 import logging
+import requests
 
 def load_config(path):
     """Load YAML config file from the given path."""
@@ -20,3 +21,10 @@ def setup_logging(verbose=False):
         level=level,
         format="%(asctime)s [%(levelname)s] %(message)s"
     )
+
+def send_discord_message(webhook_url, message):
+    """Send a message to Discord via webhook."""
+    payload = {"content": message}
+    response = requests.post(webhook_url, json=payload)
+    response.raise_for_status()
+    logging.debug(f"Discord message sent successfully")
