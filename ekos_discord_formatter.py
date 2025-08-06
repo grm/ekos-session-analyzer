@@ -506,11 +506,22 @@ def _format_capture_details(ekos_data: Dict[str, Any], detail_level: str = 'basi
         # Object name formatting
         display_obj = obj.replace('Session_', '') if obj.startswith('Session_') else obj
         
+        # Calculate sub duration format (NxTTTs)
+        sub_format = ""
+        if exposures:
+            # Group by exposure duration to show format like "10x300s + 5x120s"
+            from collections import Counter
+            exposure_counts = Counter(exposures)
+            sub_parts = []
+            for exp_time, count in sorted(exposure_counts.items(), key=lambda x: (-x[1], -x[0])):  # Sort by count desc, then duration desc
+                sub_parts.append(f"{count}x{int(exp_time)}s")
+            sub_format = " + ".join(sub_parts)
+        
         # Integration time
         total_integration = sum(exposures) if exposures else 0
         integration_str = format_duration(total_integration / 3600) if total_integration >= 60 else f"{total_integration:.0f}s"
         
-        lines.append(f"📌 {display_obj} - {filt} ({n_frames} frames, {integration_str})")
+        lines.append(f"📌 {display_obj} - {filt} ({sub_format}, {integration_str})")
         
         # HFR and FWHM statistics
         if hfrs:
