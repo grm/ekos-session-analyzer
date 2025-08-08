@@ -35,9 +35,13 @@ class EkosAnalyzer:
                 filename = os.path.basename(filepath)
                 match = re.match(r'ekos-(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})\.analyze', filename)
                 if match:
-                    timestamp_str = match.group(1).replace('-', ':')  # Fix time format
-                    timestamp_str = timestamp_str.replace('T', ' ')
-                    file_time = datetime.strptime(timestamp_str, '%Y:%m:%d %H:%M:%S')
+                    timestamp_str = match.group(1)
+                    # Replace only time part dashes with colons, keep date dashes intact
+                    # Split by 'T' to separate date and time parts
+                    date_part, time_part = timestamp_str.split('T')
+                    time_part = time_part.replace('-', ':')  # Only fix time format
+                    timestamp_str = f"{date_part} {time_part}"
+                    file_time = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
                     
                     if file_time >= cutoff:
                         analyze_files.append(filepath)
@@ -283,13 +287,12 @@ class EkosAnalyzer:
             completed_captures = [c for c in session['captures'] if c['event'] == 'complete']
             all_captures.extend(completed_captures)
             
-            # Group by object/filter
+            # Group by object/filter - don't filter out captures without HFR/stars
             for capture in completed_captures:
-                if capture.get('hfr') and capture.get('stars'):
-                    # Try to extract object name from context or use filename
-                    obj_name = self._extract_object_name(session['filepath'])
-                    key = (obj_name, capture['filter'])
-                    aggregated['capture_summary'][key].append(capture)
+                # Try to extract object name from THIS session's scheduler jobs first, then fallback
+                obj_name = self._get_object_name_from_scheduler(session['scheduler_jobs']) or self._extract_object_name(session['filepath'])
+                key = (obj_name, capture['filter'])
+                aggregated['capture_summary'][key].append(capture)
             
             # Collect temperature data
             all_temperatures.extend(session['temperature_readings'])
@@ -365,27 +368,37 @@ class EkosAnalyzer:
         
         # Calculate autofocus stats
         if all_autofocus:
+            # Filter out invalid temperatures (Ekos default values)
+            valid_temps = [af['temperature'] for af in all_autofocus if af['temperature'] > -999999]
             aggregated['autofocus_stats'] = {
                 'sessions_count': len(all_autofocus),
-                'avg_temperature': sum(af['temperature'] for af in all_autofocus) / len(all_autofocus)
+                'avg_temperature': sum(valid_temps) / len(valid_temps) if valid_temps else None
             }
         
         # Calculate guide stats - CRUCIAL for astrophotography
         if all_guide_stats:
-            # Calculate real distance from dx,dy (distance field may be in pixels, not arcsec)
-            real_distances = [((g['dx']**2 + g['dy']**2)**0.5) for g in all_guide_stats]
+            # Calculate distance from dx,dy (more reliable than pre-calculated distance field)
+            calculated_distances = []
+            for g in all_guide_stats:
+                dx = g.get('dx', 0)
+                dy = g.get('dy', 0)
+                distance = (dx**2 + dy**2)**0.5
+                calculated_distances.append(distance)
+            
+            # Filter outliers (guide corrections > 10 arcsec are usually spurious)
+            filtered_distances = [d for d in calculated_distances if d <= 10.0]
             rms_values = [g['rms'] for g in all_guide_stats if g.get('rms', 0) > 0]
             dx_values = [abs(g['dx']) for g in all_guide_stats]
             dy_values = [abs(g['dy']) for g in all_guide_stats]
             
             aggregated['guide_stats'] = {
                 'total_measurements': len(all_guide_stats),
-                'avg_distance': sum(real_distances) / len(real_distances) if real_distances else 0,
-                'max_distance': max(real_distances) if real_distances else 0,
+                'avg_distance': sum(filtered_distances) / len(filtered_distances) if filtered_distances else 0,
+                'max_distance': max(filtered_distances) if filtered_distances else 0,
                 'avg_rms': sum(rms_values) / len(rms_values) if rms_values else 0,
                 'avg_ra_error': sum(dx_values) / len(dx_values) if dx_values else 0,
                 'avg_dec_error': sum(dy_values) / len(dy_values) if dy_values else 0,
-                'guide_quality': self._calculate_guide_quality_from_distance(real_distances)
+                'guide_quality': self._calculate_guide_quality_from_distance(filtered_distances)
             }
         
         # Calculate alignment stats
@@ -480,6 +493,20 @@ class EkosAnalyzer:
             return "Average"
         else:
             return "Poor"
+    
+    def _get_object_name_from_scheduler(self, scheduler_jobs: List[Dict]) -> str:
+        """Extract object name from scheduler job data."""
+        if not scheduler_jobs:
+            return None
+            
+        # Find the most recent scheduler job start
+        started_jobs = [job for job in scheduler_jobs if job['event'] == 'start']
+        if started_jobs:
+            # Get the latest started job
+            latest_job = max(started_jobs, key=lambda x: x['timestamp'])
+            return latest_job.get('object_name', 'Unknown')
+        
+        return None
     
     def _extract_object_name(self, filepath: str) -> str:
         """Extract object name from filepath or return generic name."""

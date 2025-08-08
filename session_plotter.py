@@ -83,7 +83,8 @@ class SessionPlotter:
             'hfr_data': [],
             'guiding_data': [],
             'temperature_data': [],
-            'autofocus_events': []
+            'autofocus_events': [],
+            'capture_events': []
         }
         
         sessions = session_data.get('sessions', [])
@@ -151,6 +152,29 @@ class SessionPlotter:
                         'filter': af_session.get('filter', 'Unknown'),
                         'temperature': af_session.get('temperature')
                     })
+            
+            # Extract ALL capture events (for sessions without HFR data)
+            for capture in session.get('captures', []):
+                timestamp = capture.get('timestamp', 0)
+                capture_time = session_start + timedelta(seconds=timestamp)
+                temporal_data['capture_events'].append({
+                    'time': capture_time,
+                    'filter': capture.get('filter', 'Unknown'),
+                    'status': capture.get('event', 'unknown'),  # complete, starting, etc.
+                    'exposure': capture.get('exposure', 0)
+                })
+            
+            # Also add aborted captures from issues
+            for issue in session.get('issues', []):
+                if issue.get('type') == 'capture_aborted':
+                    timestamp = issue.get('timestamp', 0)
+                    issue_time = session_start + timedelta(seconds=timestamp)
+                    temporal_data['capture_events'].append({
+                        'time': issue_time,
+                        'filter': 'Unknown',  # Issues don't typically have filter info
+                        'status': 'aborted',
+                        'exposure': issue.get('exposure', 0)
+                    })
         
         return temporal_data
     
@@ -170,9 +194,12 @@ class SessionPlotter:
         # Offset the third axis
         ax3.spines['right'].set_position(('outward', 60))
         
-        # Plot HFR data (scatter plot colored by filter)
+        # Plot HFR data (scatter plot colored by filter) OR capture events if no HFR
         hfr_data = temporal_data['hfr_data']
+        capture_events = temporal_data.get('capture_events', [])
+        
         if hfr_data:
+            # Normal HFR plotting
             filters = set(point['filter'] for point in hfr_data)
             filter_colors = {
                 'R': '#FF6B6B', 'G': '#51CF66', 'B': '#339AF0',
@@ -187,6 +214,47 @@ class SessionPlotter:
                 
                 color = filter_colors.get(filt, '#FF6B6B')
                 ax1.scatter(times, hfrs, c=color, alpha=0.7, s=50, label=f'{filt} filter', zorder=3)
+        
+        elif capture_events:
+            # Fallback: show capture events as timeline when no HFR data
+            filter_colors = {
+                'R': '#FF6B6B', 'G': '#51CF66', 'B': '#339AF0',
+                'H': '#FF8CC8', 'O': '#69DB7C', 'S': '#FFD43B',
+                'L': '#CED4DA', 'Unknown': '#868E96'
+            }
+            
+            # Group events by filter for clean legend
+            events_by_filter = {}
+            for event in capture_events:
+                filt = event['filter']
+                if filt not in events_by_filter:
+                    events_by_filter[filt] = []
+                events_by_filter[filt].append(event)
+            
+            # Plot grouped by filter with single legend entry per filter
+            for filt, events in events_by_filter.items():
+                color = filter_colors.get(filt, '#868E96')
+                
+                # Separate complete and incomplete events
+                complete_events = [e for e in events if e['status'] == 'complete']
+                other_events = [e for e in events if e['status'] != 'complete']
+                
+                # Plot complete events (circles)
+                if complete_events:
+                    times = [e['time'] for e in complete_events]
+                    ax1.scatter(times, [1] * len(times), c=color, marker='o', 
+                               s=60, alpha=0.8, label=filt, zorder=3)
+                
+                # Plot incomplete events (X) - no additional legend entry
+                if other_events:
+                    times = [e['time'] for e in other_events]
+                    ax1.scatter(times, [1] * len(times), c=color, marker='x', 
+                               s=40, alpha=0.6, zorder=3)
+            
+            ax1.set_ylabel('Capture Events', fontsize=12)
+            ax1.set_ylim(0.5, 1.5)
+            ax1.set_yticks([1])
+            ax1.set_yticklabels(['Captures'])
         
         # Plot guiding error (line plot with smoothing)
         guiding_data = temporal_data['guiding_data']

@@ -36,7 +36,7 @@ def format_temperature(temp: float) -> str:
 
 def generate_ekos_discord_summary(ekos_data: Dict[str, Any], config: Dict[str, Any] = None) -> str:
     """Generate a Discord-friendly summary from Ekos session data with configurable detail level."""
-    if not ekos_data or not ekos_data.get('capture_summary'):
+    if not ekos_data or ekos_data.get('total_captures', 0) == 0:
         return "🌙 No Ekos session data available for this period."
     
     config = config or {}
@@ -489,6 +489,10 @@ def _format_capture_details(ekos_data: Dict[str, Any], detail_level: str = 'basi
     lines = ["📊 **Capture Details**"]
     
     capture_summary = ekos_data.get('capture_summary', {})
+    
+    # Calculate filter-specific failure statistics
+    filter_failures = _calculate_filter_failures(ekos_data)
+    
     for (obj, filt), captures in capture_summary.items():
         if not captures:
             continue
@@ -497,11 +501,8 @@ def _format_capture_details(ekos_data: Dict[str, Any], detail_level: str = 'basi
         
         # Calculate statistics based on detail level
         hfrs = [c['hfr'] for c in captures if c.get('hfr') is not None]
-        stars = [c['stars'] for c in captures if c.get('stars') is not None]
+        stars = [c['stars'] for c in captures if c.get('stars') is not None and c['stars'] > 0]
         exposures = [c['exposure'] for c in captures if c.get('exposure') is not None]
-        
-        if not hfrs and not stars:
-            continue
         
         # Object name formatting
         display_obj = obj.replace('Session_', '') if obj.startswith('Session_') else obj
@@ -523,28 +524,50 @@ def _format_capture_details(ekos_data: Dict[str, Any], detail_level: str = 'basi
         
         lines.append(f"📌 {display_obj} - {filt} ({sub_format}, {integration_str})")
         
-        # HFR and FWHM statistics
-        if hfrs:
-            # Calculate FWHM from HFR (FWHM ≈ HFR × 2.35 for Gaussian PSF)
-            fwhms = [hfr * 2.35 for hfr in hfrs]
-            
-            if detail_level == 'basic':
-                lines.append(f"   🔧 HFR: {min(hfrs):.2f} → {max(hfrs):.2f} (avg {np.mean(hfrs):.2f})")
-                lines.append(f"   📐 FWHM: {min(fwhms):.2f} → {max(fwhms):.2f} (avg {np.mean(fwhms):.2f})")
-            elif detail_level in ['advanced', 'detailed']:
-                lines.append(f"   🔧 HFR: {min(hfrs):.2f} → {max(hfrs):.2f} (avg {np.mean(hfrs):.2f}, σ {np.std(hfrs):.2f})")
-                lines.append(f"   📐 FWHM: {min(fwhms):.2f} → {max(fwhms):.2f} (avg {np.mean(fwhms):.2f}, σ {np.std(fwhms):.2f})")
-            elif detail_level == 'expert':
-                lines.append(f"   🔧 HFR: min {min(hfrs):.2f} | max {max(hfrs):.2f} | mean {np.mean(hfrs):.2f} | median {np.median(hfrs):.2f} | σ {np.std(hfrs):.2f}")
-                lines.append(f"   📐 FWHM: min {min(fwhms):.2f} | max {max(fwhms):.2f} | mean {np.mean(fwhms):.2f} | median {np.median(fwhms):.2f} | σ {np.std(fwhms):.2f}")
+        # Detect problematic session (no valid HFR data and no/few stars detected)
+        has_quality_data = len(hfrs) > 0 or len(stars) > 0
         
-        # Star statistics
-        if stars:
-            if detail_level == 'basic':
-                lines.append(f"   ⭐ Stars: {min(stars)} → {max(stars)} (avg {np.mean(stars):.0f})")
-            elif detail_level in ['advanced', 'detailed', 'expert']:
-                consistency = 1 - (np.std(stars) / max(np.mean(stars), 1))
-                lines.append(f"   ⭐ Stars: {min(stars)} → {max(stars)} (avg {np.mean(stars):.0f}, consistency {consistency:.2f})")
+        if has_quality_data:
+            # Normal session with quality data
+            if hfrs:
+                # Calculate FWHM from HFR (FWHM ≈ HFR × 2.35 for Gaussian PSF)
+                fwhms = [hfr * 2.35 for hfr in hfrs]
+                
+                if detail_level == 'basic':
+                    lines.append(f"   🔧 HFR: {min(hfrs):.2f} → {max(hfrs):.2f} (avg {np.mean(hfrs):.2f})")
+                    lines.append(f"   📐 FWHM: {min(fwhms):.2f} → {max(fwhms):.2f} (avg {np.mean(fwhms):.2f})")
+                elif detail_level in ['advanced', 'detailed']:
+                    lines.append(f"   🔧 HFR: {min(hfrs):.2f} → {max(hfrs):.2f} (avg {np.mean(hfrs):.2f}, σ {np.std(hfrs):.2f})")
+                    lines.append(f"   📐 FWHM: {min(fwhms):.2f} → {max(fwhms):.2f} (avg {np.mean(fwhms):.2f}, σ {np.std(fwhms):.2f})")
+                elif detail_level == 'expert':
+                    lines.append(f"   🔧 HFR: min {min(hfrs):.2f} | max {max(hfrs):.2f} | mean {np.mean(hfrs):.2f} | median {np.median(hfrs):.2f} | σ {np.std(hfrs):.2f}")
+                    lines.append(f"   📐 FWHM: min {min(fwhms):.2f} | max {max(fwhms):.2f} | mean {np.mean(fwhms):.2f} | median {np.median(fwhms):.2f} | σ {np.std(fwhms):.2f}")
+            
+            # Star statistics
+            if stars:
+                if detail_level == 'basic':
+                    lines.append(f"   ⭐ Stars: {min(stars)} → {max(stars)} (avg {np.mean(stars):.0f})")
+                elif detail_level in ['advanced', 'detailed', 'expert']:
+                    consistency = 1 - (np.std(stars) / max(np.mean(stars), 1))
+                    lines.append(f"   ⭐ Stars: {min(stars)} → {max(stars)} (avg {np.mean(stars):.0f}, consistency {consistency:.2f})")
+        else:
+            # Problematic session - show technical issues instead of useless stats
+            all_stars = [c.get('stars', 0) for c in captures]
+            all_hfrs = [c.get('hfr') for c in captures]
+            none_hfr_count = sum(1 for hfr in all_hfrs if hfr is None)
+            zero_stars_count = sum(1 for stars in all_stars if stars == 0)
+            
+            if none_hfr_count == len(captures):
+                lines.append(f"   ⚠️ No HFR measurements (possible plate solving issues)")
+            if zero_stars_count == len(captures):
+                lines.append(f"   ⚠️ No stars detected (possible exposure/focus issues)")
+            
+            # Show filter-specific success rate if there were failed captures
+            filter_key = f"{obj}_{filt}"
+            filter_failed = filter_failures.get(filter_key, 0)
+            if filter_failed > 0:
+                success_rate = (n_frames / (n_frames + filter_failed)) * 100
+                lines.append(f"   📊 Success rate: {success_rate:.1f}% ({filter_failed} failed)")
         
         lines.append("")
     
@@ -714,6 +737,60 @@ def _format_issues_summary(issues: List[Dict[str, Any]], alerts: List[Dict[str, 
             lines.append(f"{severity_emoji} {alert['message']}")
     
     return "\n".join(lines) if len(lines) > 1 else ""
+
+def _calculate_filter_failures(ekos_data: Dict[str, Any]) -> Dict[str, int]:
+    """Calculate failure statistics by filter/object combination."""
+    filter_failures = defaultdict(int)
+    
+    # Analyze issues by extracting context from the issue data
+    issues_summary = ekos_data.get('issues_summary', [])
+    sessions = ekos_data.get('sessions', [])
+    
+    # Extract failure context from sessions
+    for session in sessions:
+        for issue in session.get('issues', []):
+            if issue.get('type') == 'capture_aborted':
+                # Try to extract object/filter context from issue
+                # Issues might have context like object or filter information
+                obj_name = issue.get('object', 'Unknown')
+                filter_name = issue.get('filter', 'Unknown')
+                
+                # If not directly available, try to infer from timestamp context
+                if obj_name == 'Unknown' or filter_name == 'Unknown':
+                    # Find nearest capture event to get context
+                    issue_timestamp = issue.get('timestamp', 0)
+                    nearest_capture = None
+                    min_time_diff = float('inf')
+                    
+                    for capture in session.get('captures', []):
+                        time_diff = abs(capture.get('timestamp', 0) - issue_timestamp)
+                        if time_diff < min_time_diff:
+                            min_time_diff = time_diff
+                            nearest_capture = capture
+                    
+                    if nearest_capture:
+                        obj_name = nearest_capture.get('object', obj_name)  
+                        filter_name = nearest_capture.get('filter', filter_name)
+                
+                filter_key = f"{obj_name}_{filter_name}"
+                filter_failures[filter_key] += 1
+    
+    # Fallback: if no specific context, distribute failures proportionally
+    # This handles cases where issue context is not available
+    if not filter_failures and issues_summary:
+        capture_summary = ekos_data.get('capture_summary', {})
+        total_aborted = len([i for i in issues_summary if i.get('type') == 'capture_aborted'])
+        
+        if total_aborted > 0 and capture_summary:
+            # Distribute failures proportionally to filter usage
+            total_captures = sum(len(captures) for captures in capture_summary.values())
+            
+            for (obj, filt), captures in capture_summary.items():
+                filter_key = f"{obj}_{filt}"
+                proportion = len(captures) / total_captures if total_captures > 0 else 0
+                filter_failures[filter_key] = int(total_aborted * proportion)
+    
+    return dict(filter_failures)
 
 def generate_fallback_summary(fits_results: Dict) -> str:
     """Generate fallback summary when Ekos data is not available."""
