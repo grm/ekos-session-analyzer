@@ -286,89 +286,129 @@ def _generate_detailed_report(ekos_data: Dict[str, Any], advanced_metrics: Dict[
     return "\n".join(lines)
 
 def _generate_detailed_report_fragments(ekos_data: Dict[str, Any], advanced_metrics: Dict[str, Any], config: Dict[str, Any]) -> List[str]:
-    """Generate detailed report split into multiple messages to respect Discord limits."""
+    """Generate detailed report split into multiple messages with logical organization."""
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
     fragments = []
     
-    # Fragment 1: Main Summary
-    fragment1_lines = [f"**🔬 Detailed Ekos Analysis (1/3)**\n📅 {now}\n"]
+    # Fragment 1: SESSION OVERVIEW & GLOBAL PERFORMANCE
+    fragment1_lines = [f"**🔭 Session Overview (1/3)**\n📅 {now}\n"]
+    
+    # Session summary
     fragment1_lines.append(_format_session_overview(ekos_data, advanced_metrics, detail_level='detailed'))
     fragment1_lines.append("")
-    fragment1_lines.extend(_format_capture_details(ekos_data, 'detailed'))
-    
-    # Quality analysis if available
-    if advanced_metrics.get('quality_analysis'):
-        fragment1_lines.append("")
-        fragment1_lines.append(_format_quality_analysis(advanced_metrics['quality_analysis'], 'detailed'))
     
     # Session conditions
     conditions_summary = generate_conditions_summary(ekos_data)
     if conditions_summary:
-        fragment1_lines.append("")
         fragment1_lines.append(conditions_summary)
-    
-    fragments.append("\n".join(fragment1_lines))
-    
-    # Fragment 2: Guiding Analysis  
-    fragment2_lines = [f"**🎯 Guiding Analysis (2/3)**\n"]
+        fragment1_lines.append("")
     
     # Global guiding summary
     guide_summary = generate_guide_summary(ekos_data.get('guide_stats', {}))
     if not guide_summary:
-        # Extract from filter_analysis if legacy structure not available
         guide_summary = extract_guide_summary_from_filter_analysis(ekos_data.get('filter_analysis', {}))
     
     if guide_summary:
-        fragment2_lines.append(guide_summary)
+        fragment1_lines.append(guide_summary)
+        fragment1_lines.append("")
+    
+    # Global autofocus summary
+    autofocus_summary = generate_autofocus_summary(ekos_data.get('autofocus_stats', {}))
+    if autofocus_summary:
+        fragment1_lines.append(autofocus_summary)
+        fragment1_lines.append("")
+    
+    # Quality analysis if available
+    if advanced_metrics.get('quality_analysis'):
+        fragment1_lines.append(_format_quality_analysis(advanced_metrics['quality_analysis'], 'detailed'))
+        fragment1_lines.append("")
+    
+    # Issues and alerts summary
+    issues_summary = _format_issues_summary(ekos_data.get('issues_summary', []), advanced_metrics.get('alerts', []), detail_level='basic')
+    if issues_summary:
+        fragment1_lines.append(issues_summary)
+    
+    fragments.append("\n".join(fragment1_lines))
+    
+    # Fragment 2: PERFORMANCE BY FILTER
+    fragment2_lines = [f"**📊 Performance Analysis (2/3)**\n"]
+    
+    # Performance summary by filter (compact format)
+    filter_analysis = ekos_data.get('filter_analysis', {})
+    if filter_analysis:
+        fragment2_lines.append("🎯 **Filter Performance Summary**\n")
+        
+        for filter_name, analysis in sorted(filter_analysis.items()):
+            total_captures = analysis.get('total_captures', 0)
+            if total_captures == 0:
+                continue
+                
+            # Global stats for this filter
+            global_hfr = analysis.get('global_hfr_stats', {})
+            global_guide = analysis.get('global_guide_stats', {})
+            duration_hours = analysis.get('total_duration_hours', 0)
+            
+            # Format duration
+            if duration_hours >= 1:
+                duration_str = f"{duration_hours:.1f}h"
+            else:
+                duration_str = f"{int(duration_hours*60)}m"
+            
+            # Quality indicators
+            quality_indicators = []
+            if global_hfr.get('avg'):
+                quality_indicators.append(f"🔧 {global_hfr['avg']:.2f}")
+            if global_guide.get('avg_distance', 0) > 0:
+                quality = global_guide.get('guide_quality', 'Unknown')
+                emoji = {'Excellent': '🟢', 'Good': '🟡', 'Average': '🟠', 'Poor': '🔴'}.get(quality, '⚪')
+                quality_indicators.append(f"📈 {global_guide['avg_distance']:.2f}″ {emoji}")
+            
+            quality_str = " | ".join(quality_indicators)
+            
+            fragment2_lines.append(f"📌 **{filter_name}**: {total_captures}×600s ({duration_str}) - {quality_str}")
+        
         fragment2_lines.append("")
     
-    # NEW: Use comprehensive filter analysis with sub-sessions for detailed reports
-    filter_analysis_summary = generate_filter_analysis_summary(ekos_data.get('filter_analysis', {}))
-    if filter_analysis_summary:
-        fragment2_lines.append(filter_analysis_summary)
-        fragment2_lines.append("")
-    else:
-        # Fallback to legacy structures if new analysis not available
-        filter_guide_summary = generate_filter_guide_summary(ekos_data.get('filter_guide_stats', {}))
-        if filter_guide_summary:
-            fragment2_lines.append(filter_guide_summary)
-            fragment2_lines.append("")
-        
-        # Detailed session breakdown by filter (legacy)
-        detailed_filter_sessions = generate_detailed_filter_sessions(ekos_data.get('detailed_sessions', {}))
-        if detailed_filter_sessions:
-            fragment2_lines.append(detailed_filter_sessions)
+    # Detailed capture analysis (legacy method for complete data)
+    fragment2_lines.extend(_format_capture_details(ekos_data, 'detailed'))
     
     fragments.append("\n".join(fragment2_lines))
     
-    # Fragment 3: Technical Analysis & Alerts
-    fragment3_lines = [f"**🤖 Technical Analysis (3/3)**\n"]
+    # Fragment 3: DETAILED SUB-SESSIONS & TECHNICAL ANALYSIS
+    fragment3_lines = [f"**🔬 Detailed Sub-Sessions (3/3)**\n"]
     
-    # Autofocus summary
-    autofocus_summary = generate_autofocus_summary(ekos_data.get('autofocus_stats', {}))
-    if autofocus_summary:
-        fragment3_lines.append(autofocus_summary)
-        fragment3_lines.append("")
+    # Detailed filter analysis with sub-sessions
+    filter_analysis_summary = generate_filter_analysis_summary(ekos_data.get('filter_analysis', {}))
+    if filter_analysis_summary:
+        # Extract only the detailed sub-session information
+        lines = filter_analysis_summary.split('\n')
+        in_subsession = False
+        for line in lines:
+            if line.strip().startswith('#') or in_subsession:  # Sub-session details
+                fragment3_lines.append(line)
+                in_subsession = True
+            elif line.strip().startswith('📌') and in_subsession:  # New filter
+                fragment3_lines.append("")
+                fragment3_lines.append(line)
+                in_subsession = False
+            elif line.strip().startswith('📋 Sub-sessions:'):
+                fragment3_lines.append(line)
+                in_subsession = True
     
-    # Temperature analysis
+    # Temperature correlation analysis
     if advanced_metrics.get('temperature_analysis'):
-        fragment3_lines.append(_format_temperature_analysis(advanced_metrics['temperature_analysis']))
         fragment3_lines.append("")
+        fragment3_lines.append(_format_temperature_analysis(advanced_metrics['temperature_analysis']))
     
     # Detailed autofocus analysis
     if advanced_metrics.get('autofocus_analysis'):
+        fragment3_lines.append("")
         fragment3_lines.append(_format_autofocus_analysis(advanced_metrics['autofocus_analysis']))
-        fragment3_lines.append("")
-    
-    # Issues and alerts
-    issues_summary = _format_issues_summary(ekos_data.get('issues_summary', []), advanced_metrics.get('alerts', []), detail_level='detailed')
-    if issues_summary:
-        fragment3_lines.append(issues_summary)
-        fragment3_lines.append("")
     
     # Comprehensive alerts and recommendations
     comprehensive_alerts = _format_comprehensive_alerts(advanced_metrics)
     if comprehensive_alerts:
+        fragment3_lines.append("")
         fragment3_lines.append(comprehensive_alerts)
     
     fragments.append("\n".join(fragment3_lines))

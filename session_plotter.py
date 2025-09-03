@@ -179,125 +179,230 @@ class SessionPlotter:
         return temporal_data
     
     def _create_plot(self, temporal_data: Dict[str, Any]) -> tuple:
-        """Create the multi-axis temporal plot."""
-        fig, ax1 = plt.subplots(figsize=self.figure_size)
-        
-        # Setup time axis
+        """Create the multi-panel temporal plot with logical organization."""
         session_start = temporal_data['session_start']
         if not session_start:
             raise ValueError("No session start time available")
         
-        # Create additional axes
-        ax2 = ax1.twinx()  # For guiding error
-        ax3 = ax1.twinx() # For temperature
-        
-        # Offset the third axis
-        ax3.spines['right'].set_position(('outward', 60))
-        
-        # Plot HFR data (scatter plot colored by filter) OR capture events if no HFR
+        # Determine the number of subplots needed based on available data
         hfr_data = temporal_data['hfr_data']
-        capture_events = temporal_data.get('capture_events', [])
-        
-        if hfr_data:
-            # Normal HFR plotting
-            filters = set(point['filter'] for point in hfr_data)
-            filter_colors = {
-                'R': '#FF6B6B', 'G': '#51CF66', 'B': '#339AF0',
-                'H': '#FF8CC8', 'O': '#69DB7C', 'S': '#FFD43B',
-                'L': '#CED4DA', 'Unknown': '#868E96'
-            }
-            
-            for filt in filters:
-                filt_data = [p for p in hfr_data if p['filter'] == filt]
-                times = [p['time'] for p in filt_data]
-                hfrs = [p['hfr'] for p in filt_data]
-                
-                color = filter_colors.get(filt, '#FF6B6B')
-                ax1.scatter(times, hfrs, c=color, alpha=0.7, s=50, label=f'{filt} filter', zorder=3)
-        
-        elif capture_events:
-            # Fallback: show capture events as timeline when no HFR data
-            filter_colors = {
-                'R': '#FF6B6B', 'G': '#51CF66', 'B': '#339AF0',
-                'H': '#FF8CC8', 'O': '#69DB7C', 'S': '#FFD43B',
-                'L': '#CED4DA', 'Unknown': '#868E96'
-            }
-            
-            # Group events by filter for clean legend
-            events_by_filter = {}
-            for event in capture_events:
-                filt = event['filter']
-                if filt not in events_by_filter:
-                    events_by_filter[filt] = []
-                events_by_filter[filt].append(event)
-            
-            # Plot grouped by filter with single legend entry per filter
-            for filt, events in events_by_filter.items():
-                color = filter_colors.get(filt, '#868E96')
-                
-                # Separate complete and incomplete events
-                complete_events = [e for e in events if e['status'] == 'complete']
-                other_events = [e for e in events if e['status'] != 'complete']
-                
-                # Plot complete events (circles)
-                if complete_events:
-                    times = [e['time'] for e in complete_events]
-                    ax1.scatter(times, [1] * len(times), c=color, marker='o', 
-                               s=60, alpha=0.8, label=filt, zorder=3)
-                
-                # Plot incomplete events (X) - no additional legend entry
-                if other_events:
-                    times = [e['time'] for e in other_events]
-                    ax1.scatter(times, [1] * len(times), c=color, marker='x', 
-                               s=40, alpha=0.6, zorder=3)
-            
-            ax1.set_ylabel('Capture Events', fontsize=12)
-            ax1.set_ylim(0.5, 1.5)
-            ax1.set_yticks([1])
-            ax1.set_yticklabels(['Captures'])
-        
-        # Plot guiding error (line plot with smoothing)
         guiding_data = temporal_data['guiding_data']
-        if guiding_data:
-            times = [p['time'] for p in guiding_data]
-            errors = [p['error'] for p in guiding_data]
-            
-            # Smooth the guiding data using moving average
-            if len(errors) > 10:
-                window = min(50, len(errors) // 10)  # Adaptive window size
-                errors_smooth = np.convolve(errors, np.ones(window)/window, mode='same')
-                ax2.plot(times, errors_smooth, color=self.colors['guiding'], 
-                        linewidth=1.5, alpha=0.8, label='Guiding Error', zorder=2)
-            else:
-                ax2.plot(times, errors, color=self.colors['guiding'], 
-                        linewidth=1.5, alpha=0.8, label='Guiding Error', zorder=2)
-        
-        # Plot temperature (line plot)
         temp_data = temporal_data['temperature_data']
+        
+        # Create subplot configuration
+        subplot_count = 0
+        if hfr_data: subplot_count += 1
+        if guiding_data: subplot_count += 1
+        if temp_data: subplot_count += 1
+        
+        if subplot_count == 0:
+            subplot_count = 1  # At least show capture events
+        
+        # Create subplots with logical vertical arrangement
+        fig, axes = plt.subplots(subplot_count, 1, figsize=(12, 3 * subplot_count), 
+                                sharex=True)
+        
+        if subplot_count == 1:
+            axes = [axes]  # Ensure axes is always a list
+        
+        current_ax = 0
+        
+        # Plot 1: HFR Evolution (most important for image quality)
+        if hfr_data:
+            ax_hfr = axes[current_ax]
+            self._plot_hfr_data(ax_hfr, hfr_data)
+            current_ax += 1
+        
+        # Plot 2: Guiding Performance (second most important)
+        if guiding_data:
+            ax_guide = axes[current_ax]
+            self._plot_guiding_data(ax_guide, guiding_data)
+            current_ax += 1
+        
+        # Plot 3: Temperature Evolution (environmental conditions)
         if temp_data:
-            times = [p['time'] for p in temp_data]
-            temps = [p['temperature'] for p in temp_data]
-            ax3.plot(times, temps, color=self.colors['temperature'], 
-                    linewidth=2, alpha=0.9, label='Temperature', zorder=1)
+            ax_temp = axes[current_ax]
+            self._plot_temperature_data(ax_temp, temp_data)
+            current_ax += 1
         
-        # Mark autofocus events
+        # Mark autofocus events on all plots
         af_events = temporal_data['autofocus_events']
-        if af_events:
-            for event in af_events:
-                ax1.axvline(x=event['time'], color=self.colors['autofocus'], 
-                           linestyle='--', alpha=0.6, linewidth=1)
+        if af_events and current_ax > 0:
+            for i in range(current_ax):
+                for event in af_events:
+                    axes[i].axvline(x=event['time'], color=self.colors['autofocus'], 
+                                   linestyle='--', alpha=0.6, linewidth=1)
         
-        # Formatting
-        self._format_axes(ax1, ax2, ax3, temporal_data)
-        self._add_legends(ax1, ax2, ax3)
-        self._add_title_and_labels(fig, ax1, ax2, ax3, temporal_data)
+        # Format all axes
+        self._format_time_axis(axes[-1])  # Only bottom axis gets time labels
+        for i, ax in enumerate(axes):
+            ax.grid(True, alpha=0.3, color=self.colors['grid'])
         
-        # Grid
-        ax1.grid(True, alpha=0.3, color=self.colors['grid'])
+        # Add overall title and session info
+        self._add_session_title(fig, temporal_data)
         
         plt.tight_layout()
+        plt.subplots_adjust(hspace=0.3)  # Add space between subplots
         
-        return fig, (ax1, ax2, ax3)
+        return fig, axes
+    
+    def _plot_hfr_data(self, ax, hfr_data):
+        """Plot HFR evolution by filter."""
+        # Group by filter
+        filters = set(point['filter'] for point in hfr_data)
+        filter_colors = {
+            'R': '#FF6B6B', 'G': '#51CF66', 'B': '#339AF0',
+            'H': '#FF8CC8', 'O': '#69DB7C', 'S': '#FFD43B',
+            'L': '#CED4DA', 'Unknown': '#868E96'
+        }
+        
+        for filt in sorted(filters):
+            filt_data = [p for p in hfr_data if p['filter'] == filt]
+            times = [p['time'] for p in filt_data]
+            hfrs = [p['hfr'] for p in filt_data]
+            
+            color = filter_colors.get(filt, '#868E96')
+            
+            # Plot as both scatter and line for better visibility
+            ax.scatter(times, hfrs, c=color, alpha=0.8, s=60, zorder=3)
+            if len(times) > 1:
+                ax.plot(times, hfrs, c=color, alpha=0.5, linewidth=1, label=f'{filt} filter')
+        
+        ax.set_ylabel('HFR (pixels)', fontsize=11, color=self.colors['hfr'])
+        ax.set_title('🔧 Image Quality (HFR) Evolution', fontsize=12, pad=10)
+        ax.tick_params(axis='y', labelcolor=self.colors['hfr'])
+        
+        # Add HFR statistics
+        if hfr_data:
+            hfr_values = [p['hfr'] for p in hfr_data]
+            hfr_min, hfr_max, hfr_avg = min(hfr_values), max(hfr_values), np.mean(hfr_values)
+            ax.text(0.02, 0.95, f'Min: {hfr_min:.2f} | Max: {hfr_max:.2f} | Avg: {hfr_avg:.2f}', 
+                   transform=ax.transAxes, verticalalignment='top', fontsize=9, 
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='black', alpha=0.7))
+        
+        ax.legend(loc='upper right', framealpha=0.9)
+    
+    def _plot_guiding_data(self, ax, guiding_data):
+        """Plot guiding performance evolution."""
+        times = [p['time'] for p in guiding_data]
+        errors = [p['error'] for p in guiding_data]
+        
+        # Plot raw data as light scatter
+        ax.scatter(times, errors, c=self.colors['guiding'], alpha=0.3, s=10, zorder=1)
+        
+        # Plot smoothed trend line
+        if len(errors) > 20:
+            window = min(50, len(errors) // 10)
+            errors_smooth = np.convolve(errors, np.ones(window)/window, mode='same')
+            ax.plot(times, errors_smooth, color=self.colors['guiding'], 
+                   linewidth=2, alpha=0.9, label='Smoothed trend', zorder=2)
+        
+        # Add quality zones
+        ax.axhspan(0, 1.0, alpha=0.1, color='green', label='Excellent (<1″)')
+        ax.axhspan(1.0, 2.0, alpha=0.1, color='yellow', label='Good (1-2″)')
+        ax.axhspan(2.0, 3.0, alpha=0.1, color='orange', label='Average (2-3″)')
+        
+        ax.set_ylabel('Guiding Error (arcsec)', fontsize=11, color=self.colors['guiding'])
+        ax.set_title('📈 Guiding Performance Evolution', fontsize=12, pad=10)
+        ax.tick_params(axis='y', labelcolor=self.colors['guiding'])
+        
+        # Add guiding statistics
+        if guiding_data:
+            errors_filtered = [e for e in errors if e <= 10.0]  # Remove outliers
+            if errors_filtered:
+                guide_min, guide_max, guide_avg = min(errors_filtered), max(errors_filtered), np.mean(errors_filtered)
+                ax.text(0.02, 0.95, f'Min: {guide_min:.2f}″ | Max: {guide_max:.2f}″ | Avg: {guide_avg:.2f}″', 
+                       transform=ax.transAxes, verticalalignment='top', fontsize=9,
+                       bbox=dict(boxstyle='round,pad=0.3', facecolor='black', alpha=0.7))
+        
+        # Set reasonable Y-axis limit (exclude extreme outliers)
+        if errors:
+            errors_p95 = np.percentile(errors, 95)  # 95th percentile
+            ax.set_ylim(0, min(errors_p95 * 1.2, 5.0))  # Cap at 5 arcsec for readability
+        
+        ax.legend(loc='upper right', framealpha=0.9, fontsize=9)
+    
+    def _plot_temperature_data(self, ax, temp_data):
+        """Plot temperature evolution."""
+        times = [p['time'] for p in temp_data]
+        temps = [p['temperature'] for p in temp_data]
+        
+        # Plot temperature as area plot for better visibility
+        ax.plot(times, temps, color=self.colors['temperature'], 
+               linewidth=2, alpha=0.9, label='Temperature')
+        ax.fill_between(times, temps, alpha=0.2, color=self.colors['temperature'])
+        
+        ax.set_ylabel('Temperature (°C)', fontsize=11, color=self.colors['temperature'])
+        ax.set_title('🌡️ Temperature Evolution', fontsize=12, pad=10)
+        ax.tick_params(axis='y', labelcolor=self.colors['temperature'])
+        
+        # Add temperature statistics
+        if temp_data:
+            temp_min, temp_max, temp_avg = min(temps), max(temps), np.mean(temps)
+            temp_range = temp_max - temp_min
+            ax.text(0.02, 0.95, f'Range: {temp_range:.1f}°C | Min: {temp_min:.1f}°C | Max: {temp_max:.1f}°C', 
+                   transform=ax.transAxes, verticalalignment='top', fontsize=9,
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='black', alpha=0.7))
+        
+        ax.legend(loc='upper right', framealpha=0.9)
+    
+    def _format_time_axis(self, ax):
+        """Format the time axis (only for bottom subplot)."""
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+        ax.xaxis.set_major_locator(mdates.HourLocator(interval=1))
+        ax.xaxis.set_minor_locator(mdates.MinuteLocator(interval=30))
+        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
+        ax.set_xlabel('Time', fontsize=11)
+    
+    def _add_session_title(self, fig, temporal_data):
+        """Add overall session title and summary."""
+        session_start = temporal_data['session_start']
+        session_date = session_start.strftime('%Y-%m-%d')
+        
+        # Calculate session duration
+        all_times = []
+        for data_type in ['hfr_data', 'guiding_data', 'temperature_data']:
+            if temporal_data.get(data_type):
+                all_times.extend([p['time'] for p in temporal_data[data_type]])
+        
+        if all_times:
+            session_duration = (max(all_times) - min(all_times)).total_seconds() / 3600
+            duration_str = f"({session_duration:.1f}h)"
+        else:
+            duration_str = ""
+        
+        fig.suptitle(f'📡 Astrophotography Session Analysis - {session_date} {duration_str}', 
+                    fontsize=14, fontweight='bold', y=0.98)
+        
+        # Add performance summary at the bottom
+        summary_parts = []
+        
+        if temporal_data['hfr_data']:
+            hfr_values = [p['hfr'] for p in temporal_data['hfr_data']]
+            hfr_avg = np.mean(hfr_values)
+            summary_parts.append(f'🔧 HFR: {hfr_avg:.2f}px')
+        
+        if temporal_data['guiding_data']:
+            errors = [p['error'] for p in temporal_data['guiding_data']]
+            errors_filtered = [e for e in errors if e <= 10.0]
+            if errors_filtered:
+                guide_avg = np.mean(errors_filtered)
+                guide_quality = "Excellent" if guide_avg < 1.0 else "Good" if guide_avg < 2.0 else "Average"
+                summary_parts.append(f'📈 Guide: {guide_avg:.2f}″ ({guide_quality})')
+        
+        if temporal_data['temperature_data']:
+            temps = [p['temperature'] for p in temporal_data['temperature_data']]
+            temp_range = max(temps) - min(temps)
+            stability = "Stable" if temp_range < 2 else "Variable"
+            summary_parts.append(f'🌡️ Temp: {stability} (Δ{temp_range:.1f}°C)')
+        
+        if temporal_data['autofocus_events']:
+            af_count = len(temporal_data['autofocus_events'])
+            summary_parts.append(f'🎯 Autofocus: {af_count} sessions')
+        
+        if summary_parts:
+            fig.text(0.5, 0.02, ' | '.join(summary_parts), ha='center', 
+                    fontsize=10, alpha=0.8)
     
     def _format_axes(self, ax1, ax2, ax3, temporal_data):
         """Format the axes with appropriate ranges and ticks."""
