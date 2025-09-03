@@ -61,7 +61,7 @@ def main():
         
         # Generate Discord summary using unified formatter
         # The formatter automatically detects available features and configuration
-        summary = generate_ekos_discord_summary(ekos_results, config)
+        summaries = generate_ekos_discord_summary(ekos_results, config)
         
         # Inform user about the mode being used
         report_level = config.get('discord_report_level', 'standard')
@@ -71,10 +71,17 @@ def main():
         analytics_mode = "advanced analytics" if (should_use_advanced and ADVANCED_METRICS_AVAILABLE) else "basic analytics"
         print(f"📊 Using {report_level} report with {analytics_mode}")
         
+        # Display all fragments for preview
+        if len(summaries) > 1:
+            print(f"📨 Generated {len(summaries)} messages for Discord (detailed mode)")
+        
         print("\n" + "="*50)
         print("SUMMARY:")
         print("="*50)
-        print(summary)
+        for i, summary in enumerate(summaries):
+            if len(summaries) > 1:
+                print(f"\n--- MESSAGE {i+1}/{len(summaries)} ({len(summary)} chars) ---")
+            print(summary)
         print("="*50 + "\n")
         
         # Generate session plot if enabled and available
@@ -101,15 +108,40 @@ def main():
         # Send to Discord (unless dry-run)
         if args.dry_run:
             print("🧪 DRY-RUN MODE: Summary generated but not sent to Discord.")
+            if len(summaries) > 1:
+                print(f"🧪 Would send {len(summaries)} messages to Discord")
             if plot_path:
                 print(f"🧪 Plot would be sent: {plot_path}")
         else:
-            if plot_path:
-                send_discord_message_with_image(webhook_url, summary, plot_path)
-                print("✅ Summary and plot sent to Discord.")
+            # Send multiple messages if needed
+            if len(summaries) > 1:
+                print(f"📨 Sending {len(summaries)} messages to Discord...")
+                
+                # Send first message with plot if available
+                if plot_path:
+                    send_discord_message_with_image(webhook_url, summaries[0], plot_path)
+                    print(f"✅ Message 1/{len(summaries)} sent with plot.")
+                else:
+                    send_discord_message(webhook_url, summaries[0])
+                    print(f"✅ Message 1/{len(summaries)} sent.")
+                
+                # Send remaining messages (text only)
+                import time
+                for i, summary in enumerate(summaries[1:], 2):
+                    time.sleep(1)  # Small delay to avoid rate limiting
+                    send_discord_message(webhook_url, summary)
+                    print(f"✅ Message {i}/{len(summaries)} sent.")
+                
+                print(f"🎉 All {len(summaries)} messages sent successfully!")
+                
             else:
-                send_discord_message(webhook_url, summary)
-                print("✅ Summary sent to Discord.")
+                # Single message mode (standard/minimal)
+                if plot_path:
+                    send_discord_message_with_image(webhook_url, summaries[0], plot_path)
+                    print("✅ Summary and plot sent to Discord.")
+                else:
+                    send_discord_message(webhook_url, summaries[0])
+                    print("✅ Summary sent to Discord.")
         
         # Clean up plot file after sending/dry-run
         if plot_path and os.path.exists(plot_path):

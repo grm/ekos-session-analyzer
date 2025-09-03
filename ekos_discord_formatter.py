@@ -34,10 +34,10 @@ def format_temperature(temp: float) -> str:
     """Format temperature with appropriate precision."""
     return f"{temp:.1f}°C"
 
-def generate_ekos_discord_summary(ekos_data: Dict[str, Any], config: Dict[str, Any] = None) -> str:
-    """Generate a Discord-friendly summary from Ekos session data with configurable detail level."""
+def generate_ekos_discord_summary(ekos_data: Dict[str, Any], config: Dict[str, Any] = None) -> List[str]:
+    """Generate Discord-friendly summary(s) from Ekos session data with automatic message splitting."""
     if not ekos_data or ekos_data.get('total_captures', 0) == 0:
-        return "🌙 No Ekos session data available for this period."
+        return ["🌙 No Ekos session data available for this period."]
     
     config = config or {}
     report_level = config.get('discord_report_level', 'standard')
@@ -58,11 +58,16 @@ def generate_ekos_discord_summary(ekos_data: Dict[str, Any], config: Dict[str, A
     
     # Route to appropriate formatter based on level
     if report_level == 'minimal':
-        return _generate_minimal_report(ekos_data, advanced_metrics, config)
+        return [_generate_minimal_report(ekos_data, advanced_metrics, config)]
     elif report_level == 'detailed':
-        return _generate_detailed_report(ekos_data, advanced_metrics, config)
+        return _generate_detailed_report_fragments(ekos_data, advanced_metrics, config)
     else:  # standard or default
-        return _generate_standard_report(ekos_data, advanced_metrics, config)
+        standard_result = _generate_standard_report(ekos_data, advanced_metrics, config)
+        # Handle both single string and list of strings from standard report
+        if isinstance(standard_result, list):
+            return standard_result
+        else:
+            return [standard_result]
 
 def _generate_minimal_report(ekos_data: Dict[str, Any], advanced_metrics: Dict[str, Any], config: Dict[str, Any]) -> str:
     """Generate minimal report for quick notifications."""
@@ -100,48 +105,111 @@ def _generate_minimal_report(ekos_data: Dict[str, Any], advanced_metrics: Dict[s
     
     return "\n".join(lines)
 
-def _generate_standard_report(ekos_data: Dict[str, Any], advanced_metrics: Dict[str, Any], config: Dict[str, Any]) -> str:
-    """Generate standard report (enhanced version of original)."""
+def _generate_standard_report(ekos_data: Dict[str, Any], advanced_metrics: Dict[str, Any], config: Dict[str, Any]) -> List[str]:
+    """Generate standard report with intelligent splitting if needed."""
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-    lines = [f"**🔭 Ekos Session Summary**\n📅 {now}\n"]
+    
+    # Build header and basic sections
+    header_lines = [f"**🔭 Ekos Session Summary**\n📅 {now}\n"]
     
     # Session overview
-    lines.append(_format_session_overview(ekos_data, advanced_metrics))
-    lines.append("")
+    header_lines.append(_format_session_overview(ekos_data, advanced_metrics))
+    header_lines.append("")
     
-    # Capture details
-    lines.extend(_format_capture_details(ekos_data, 'basic'))
-    
-    # Always add session conditions (même si pas d'analytics avancées)
+    # Always add session conditions
     conditions_summary = generate_conditions_summary(ekos_data)
     if conditions_summary:
-        lines.append("")
-        lines.append(conditions_summary)
+        header_lines.append(conditions_summary)
+        header_lines.append("")
     
     # CRUCIAL: Add guiding summary (always show - most important for astrophotography)
+    # Try both legacy guide_stats and new filter_analysis structure
     guide_summary = generate_guide_summary(ekos_data.get('guide_stats', {}))
-    if guide_summary:
-        lines.append("")
-        lines.append(guide_summary)
+    if not guide_summary:
+        # Extract from filter_analysis if legacy structure not available
+        guide_summary = extract_guide_summary_from_filter_analysis(ekos_data.get('filter_analysis', {}))
     
-    # Always add autofocus summary (même si pas d'analytics avancées)
+    if guide_summary:
+        header_lines.append(guide_summary)
+        header_lines.append("")
+    
+    # Build footer sections
+    footer_lines = []
+    
+    # Always add autofocus summary
     autofocus_summary = generate_autofocus_summary(ekos_data.get('autofocus_stats', {}))
     if autofocus_summary:
-        lines.append("")
-        lines.append(autofocus_summary)
+        footer_lines.append(autofocus_summary)
+        footer_lines.append("")
     
     # Quality summary if advanced metrics available
     if advanced_metrics.get('quality_analysis'):
-        lines.append("")
-        lines.append(_format_quality_analysis(advanced_metrics['quality_analysis'], 'basic'))
+        footer_lines.append(_format_quality_analysis(advanced_metrics['quality_analysis'], 'basic'))
+        footer_lines.append("")
     
     # Issues and alerts
     issues_summary = _format_issues_summary(ekos_data.get('issues_summary', []), advanced_metrics.get('alerts', []))
     if issues_summary:
-        lines.append("")
-        lines.append(issues_summary)
+        footer_lines.append(issues_summary)
     
-    return "\n".join(lines)
+    # NEW: Check if we need intelligent splitting for filter analysis
+    filter_analysis = ekos_data.get('filter_analysis', {})
+    if filter_analysis:
+        # Calculate space used by header and footer
+        header_content = "\n".join(header_lines)
+        footer_content = "\n".join(footer_lines)
+        fixed_content_length = len(header_content) + len(footer_content) + 100  # +100 for spacing
+        
+        # Check if filter analysis needs splitting
+        filter_summary = generate_filter_analysis_summary(filter_analysis, ekos_data.get('capture_summary', {}))
+        
+        # Test the complete message length without truncation to decide if splitting is needed
+        complete_test_message = header_content + "\n\n" + filter_summary
+        if footer_content:
+            complete_test_message += "\n\n" + footer_content
+        
+        # Use validate_discord_message with allow_oversized=True to get accurate length without truncation
+        from utils import validate_discord_message
+        validated_test = validate_discord_message(complete_test_message, allow_oversized=True)
+        
+        if len(validated_test) > 1900:  # Discord limit with margin
+            # Use intelligent splitting
+            messages = []
+            
+            # First message: Header + conditions + guide
+            first_message = header_content
+            if len(first_message) < 1900:
+                messages.append(first_message)
+            
+            # Filter analysis messages (split intelligently between filters)
+            filter_messages = split_filter_analysis_intelligently(filter_analysis)
+            messages.extend(filter_messages)
+            
+            # Final message: Footer content
+            if footer_lines and len(footer_content) > 10:
+                footer_message = f"**🔭 Session Summary (Final)**\n\n{footer_content}"
+                if len(footer_message) < 1900:
+                    messages.append(footer_message)
+            
+            return messages
+        else:
+            # Single message fits
+            all_content = header_content + "\n\n" + filter_summary
+            if footer_content:
+                all_content += "\n\n" + footer_content
+            return [all_content]
+    else:
+        # Fallback to legacy filter guide summary if new analysis not available
+        filter_guide_summary = generate_filter_guide_summary(ekos_data.get('filter_guide_stats', {}))
+        if filter_guide_summary:
+            header_lines.append(filter_guide_summary)
+            header_lines.append("")
+        
+        # Single message
+        all_content = "\n".join(header_lines)
+        if footer_lines:
+            all_content += "\n" + "\n".join(footer_lines)
+        return [all_content]
 
 def _generate_detailed_report(ekos_data: Dict[str, Any], advanced_metrics: Dict[str, Any], config: Dict[str, Any]) -> str:
     """Generate detailed report for enthusiasts."""
@@ -171,6 +239,18 @@ def _generate_detailed_report(ekos_data: Dict[str, Any], advanced_metrics: Dict[
     if guide_summary:
         lines.append("")
         lines.append(guide_summary)
+    
+    # NEW: Add detailed guiding by filter for detailed reports
+    filter_guide_summary = generate_filter_guide_summary(ekos_data.get('filter_guide_stats', {}))
+    if filter_guide_summary:
+        lines.append("")
+        lines.append(filter_guide_summary)
+    
+    # NEW: Add detailed session breakdown by filter for detailed reports
+    detailed_filter_sessions = generate_detailed_filter_sessions(ekos_data.get('detailed_sessions', {}))
+    if detailed_filter_sessions:
+        lines.append("")
+        lines.append(detailed_filter_sessions)
     
     # Add standard autofocus summary (from standard mode)
     autofocus_summary = generate_autofocus_summary(ekos_data.get('autofocus_stats', {}))
@@ -204,6 +284,96 @@ def _generate_detailed_report(ekos_data: Dict[str, Any], advanced_metrics: Dict[
         lines.append(comprehensive_alerts)
     
     return "\n".join(lines)
+
+def _generate_detailed_report_fragments(ekos_data: Dict[str, Any], advanced_metrics: Dict[str, Any], config: Dict[str, Any]) -> List[str]:
+    """Generate detailed report split into multiple messages to respect Discord limits."""
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    fragments = []
+    
+    # Fragment 1: Main Summary
+    fragment1_lines = [f"**🔬 Detailed Ekos Analysis (1/3)**\n📅 {now}\n"]
+    fragment1_lines.append(_format_session_overview(ekos_data, advanced_metrics, detail_level='detailed'))
+    fragment1_lines.append("")
+    fragment1_lines.extend(_format_capture_details(ekos_data, 'detailed'))
+    
+    # Quality analysis if available
+    if advanced_metrics.get('quality_analysis'):
+        fragment1_lines.append("")
+        fragment1_lines.append(_format_quality_analysis(advanced_metrics['quality_analysis'], 'detailed'))
+    
+    # Session conditions
+    conditions_summary = generate_conditions_summary(ekos_data)
+    if conditions_summary:
+        fragment1_lines.append("")
+        fragment1_lines.append(conditions_summary)
+    
+    fragments.append("\n".join(fragment1_lines))
+    
+    # Fragment 2: Guiding Analysis  
+    fragment2_lines = [f"**🎯 Guiding Analysis (2/3)**\n"]
+    
+    # Global guiding summary
+    guide_summary = generate_guide_summary(ekos_data.get('guide_stats', {}))
+    if not guide_summary:
+        # Extract from filter_analysis if legacy structure not available
+        guide_summary = extract_guide_summary_from_filter_analysis(ekos_data.get('filter_analysis', {}))
+    
+    if guide_summary:
+        fragment2_lines.append(guide_summary)
+        fragment2_lines.append("")
+    
+    # NEW: Use comprehensive filter analysis with sub-sessions for detailed reports
+    filter_analysis_summary = generate_filter_analysis_summary(ekos_data.get('filter_analysis', {}))
+    if filter_analysis_summary:
+        fragment2_lines.append(filter_analysis_summary)
+        fragment2_lines.append("")
+    else:
+        # Fallback to legacy structures if new analysis not available
+        filter_guide_summary = generate_filter_guide_summary(ekos_data.get('filter_guide_stats', {}))
+        if filter_guide_summary:
+            fragment2_lines.append(filter_guide_summary)
+            fragment2_lines.append("")
+        
+        # Detailed session breakdown by filter (legacy)
+        detailed_filter_sessions = generate_detailed_filter_sessions(ekos_data.get('detailed_sessions', {}))
+        if detailed_filter_sessions:
+            fragment2_lines.append(detailed_filter_sessions)
+    
+    fragments.append("\n".join(fragment2_lines))
+    
+    # Fragment 3: Technical Analysis & Alerts
+    fragment3_lines = [f"**🤖 Technical Analysis (3/3)**\n"]
+    
+    # Autofocus summary
+    autofocus_summary = generate_autofocus_summary(ekos_data.get('autofocus_stats', {}))
+    if autofocus_summary:
+        fragment3_lines.append(autofocus_summary)
+        fragment3_lines.append("")
+    
+    # Temperature analysis
+    if advanced_metrics.get('temperature_analysis'):
+        fragment3_lines.append(_format_temperature_analysis(advanced_metrics['temperature_analysis']))
+        fragment3_lines.append("")
+    
+    # Detailed autofocus analysis
+    if advanced_metrics.get('autofocus_analysis'):
+        fragment3_lines.append(_format_autofocus_analysis(advanced_metrics['autofocus_analysis']))
+        fragment3_lines.append("")
+    
+    # Issues and alerts
+    issues_summary = _format_issues_summary(ekos_data.get('issues_summary', []), advanced_metrics.get('alerts', []), detail_level='detailed')
+    if issues_summary:
+        fragment3_lines.append(issues_summary)
+        fragment3_lines.append("")
+    
+    # Comprehensive alerts and recommendations
+    comprehensive_alerts = _format_comprehensive_alerts(advanced_metrics)
+    if comprehensive_alerts:
+        fragment3_lines.append(comprehensive_alerts)
+    
+    fragments.append("\n".join(fragment3_lines))
+    
+    return fragments
 
 
 def generate_session_overview(ekos_data: Dict[str, Any]) -> str:
@@ -357,14 +527,19 @@ def generate_mount_tracking_summary(ekos_data: Dict[str, Any]) -> str:
 
 def generate_guide_summary(guide_stats: Dict[str, Any]) -> str:
     """Generate guiding performance summary - CRUCIAL for astrophotography."""
-    if not guide_stats or not guide_stats.get('total_measurements'):
+    # Check both legacy guide_stats and new filter_analysis structure
+    if guide_stats and guide_stats.get('total_measurements'):
+        # Legacy structure
+        total_measurements = guide_stats['total_measurements']
+        avg_distance = guide_stats.get('avg_distance', 0)
+        guide_quality = guide_stats.get('guide_quality', 'Unknown')
+        ra_error = guide_stats.get('avg_ra_error', 0)
+        dec_error = guide_stats.get('avg_dec_error', 0)
+    else:
+        # Try to extract from ekos_data structure passed in context
         return ""
     
     lines = ["🌟 **Guiding Performance**"]
-    
-    total_measurements = guide_stats['total_measurements']
-    avg_distance = guide_stats.get('avg_distance', 0)
-    guide_quality = guide_stats.get('guide_quality', 'Unknown')
     
     lines.append(f"📊 Measurements: {total_measurements}")
     lines.append(f"🎯 Avg Error: {avg_distance:.2f}″")
@@ -382,10 +557,505 @@ def generate_guide_summary(guide_stats: Dict[str, Any]) -> str:
     lines.append(f"{emoji} Guide Quality: {guide_quality}")
     
     # Add detailed error breakdown if available
-    ra_error = guide_stats.get('avg_ra_error', 0)
-    dec_error = guide_stats.get('avg_dec_error', 0)
     if ra_error > 0 or dec_error > 0:
         lines.append(f"📈 RA: {ra_error:.2f}″ | DEC: {dec_error:.2f}″")
+    
+    return "\n".join(lines)
+
+
+def extract_guide_summary_from_filter_analysis(filter_analysis: Dict[str, Any]) -> str:
+    """Extract overall guiding summary from filter analysis structure."""
+    if not filter_analysis:
+        return ""
+    
+    # Aggregate guide stats across all filters
+    total_measurements = 0
+    all_distances = []
+    all_qualities = []
+    
+    for filter_name, analysis in filter_analysis.items():
+        global_guide = analysis.get('global_guide_stats', {})
+        if global_guide.get('total_measurements', 0) > 0:
+            measurements = global_guide['total_measurements']
+            distance = global_guide.get('avg_distance', 0)
+            quality = global_guide.get('guide_quality', 'Unknown')
+            
+            total_measurements += measurements
+            if distance > 0:
+                # Weight by number of measurements
+                for _ in range(measurements):
+                    all_distances.append(distance)
+            all_qualities.append(quality)
+    
+    if total_measurements == 0:
+        return ""
+    
+    # Calculate weighted average
+    avg_distance = sum(all_distances) / len(all_distances) if all_distances else 0
+    
+    # Determine overall quality (take the most common, or worst if tied)
+    quality_counts = {}
+    for quality in all_qualities:
+        quality_counts[quality] = quality_counts.get(quality, 0) + 1
+    
+    if quality_counts:
+        # Get most common quality, but prefer worse quality if tied
+        quality_priority = {'Poor': 0, 'Average': 1, 'Good': 2, 'Excellent': 3}
+        sorted_qualities = sorted(quality_counts.items(), 
+                                key=lambda x: (-x[1], quality_priority.get(x[0], 4)))
+        overall_quality = sorted_qualities[0][0]
+    else:
+        overall_quality = 'Unknown'
+    
+    lines = ["🌟 **Guiding Performance**"]
+    lines.append(f"📊 Measurements: {total_measurements}")
+    lines.append(f"🎯 Avg Error: {avg_distance:.2f}″")
+    
+    # Quality assessment with emoji
+    quality_emoji = {
+        'Excellent': '🟢',
+        'Good': '🟡', 
+        'Average': '🟠',
+        'Poor': '🔴',
+        'Unknown': '⚪'
+    }
+    
+    emoji = quality_emoji.get(overall_quality, '⚪')
+    lines.append(f"{emoji} Guide Quality: {overall_quality}")
+    
+    return "\n".join(lines)
+
+def generate_filter_analysis_blocks(filter_analysis: Dict[str, Any], capture_summary: Dict = None) -> List[Dict[str, Any]]:
+    """Generate comprehensive capture details blocks grouped by object then by filter."""
+    if not filter_analysis:
+        return []
+    
+    # Use capture_summary for HFR/Stars data if available
+    capture_summary = capture_summary or {}
+    
+    # First, group filters by object
+    objects_data = {}
+    
+    for filter_name, analysis in filter_analysis.items():
+        if analysis.get('total_captures', 0) == 0:
+            continue
+        
+        # Extract object name from sub-sessions or use default
+        object_name = "NGC 7380"  # Default object
+        sub_sessions = analysis.get('sub_sessions', [])
+        if sub_sessions:
+            # Try to get object name from first sub-session if available
+            first_sub = sub_sessions[0]
+            object_name = first_sub.get('object_name', 'NGC 7380')
+        
+        # Group by object
+        if object_name not in objects_data:
+            objects_data[object_name] = {}
+        
+        objects_data[object_name][filter_name] = analysis
+    
+    blocks = []
+    
+    # Sort objects by total captures across all filters
+    object_totals = {}
+    for obj_name, filters_data in objects_data.items():
+        total_captures = sum(f.get('total_captures', 0) for f in filters_data.values())
+        object_totals[obj_name] = total_captures
+    
+    sorted_objects = sorted(object_totals.items(), key=lambda x: x[1], reverse=True)
+    
+    for object_name, total_obj_captures in sorted_objects:
+        if total_obj_captures == 0:
+            continue
+            
+        # Build object block
+        object_lines = []
+        object_lines.append(f"🎯 **{object_name}**")
+        
+        filters_data = objects_data[object_name]
+        
+        # Sort filters within object by captures (most used first) 
+        sorted_filters = sorted(filters_data.items(), 
+                              key=lambda x: x[1].get('total_captures', 0), reverse=True)
+        
+        for filter_name, analysis in sorted_filters:
+            total_captures = analysis.get('total_captures', 0)
+            total_duration = analysis.get('total_duration_hours', 0)
+            exposure_time = int(analysis.get('exposure_time', 0))
+            total_sub_sessions = analysis.get('total_sub_sessions', 0)
+            
+            # Global guide stats
+            global_guide = analysis.get('global_guide_stats', {})
+            avg_distance = global_guide.get('avg_distance', 0)
+            quality = global_guide.get('guide_quality', 'Unknown')
+            
+            # Quality emoji
+            quality_emoji = {
+                'Excellent': '🟢',
+                'Good': '🟡', 
+                'Average': '🟠',
+                'Poor': '🔴',
+                'No Data': '⚪'
+            }
+            emoji = quality_emoji.get(quality, '⚪')
+            
+            # Duration formatting (use exact format like "1h 10m")
+            if total_duration >= 1:
+                hours = int(total_duration)
+                minutes = int((total_duration - hours) * 60)
+                if minutes > 0:
+                    duration_str = f"{hours}h {minutes}m"
+                else:
+                    duration_str = f"{hours}h"
+            else:
+                minutes = int(total_duration * 60)
+                duration_str = f"{minutes}m"
+            
+            # Filter header with exposure format like "7x600s"
+            exposure_format = f"{total_captures}×{exposure_time}s"
+            object_lines.append(f"📌 {filter_name} Filter ({exposure_format}, {duration_str})")
+            
+            # Extract real HFR/Stars data from capture_summary
+            filter_captures = []
+            if capture_summary:
+                for (obj, filt), captures in capture_summary.items():
+                    if filt == filter_name:
+                        filter_captures.extend(captures)
+            
+            # Calculate real statistics from capture data
+            if filter_captures:
+                # HFR statistics (display first if available)
+                hfrs = [c['hfr'] for c in filter_captures if c.get('hfr') is not None and c['hfr'] > 0]
+                if hfrs:
+                    hfr_min = min(hfrs)
+                    hfr_max = max(hfrs)
+                    hfr_avg = np.mean(hfrs)
+                    hfr_std = np.std(hfrs)
+                    
+                    object_lines.append(f"   🔧 HFR: {hfr_min:.2f} → {hfr_max:.2f} (avg {hfr_avg:.2f}, σ {hfr_std:.2f})")
+                    object_lines.append(f"   📐 FWHM: {hfr_min*2.35:.2f} → {hfr_max*2.35:.2f} (avg {hfr_avg*2.35:.2f}, σ {hfr_std*2.35:.2f})")
+                
+                # Stars statistics
+                stars = [c['stars'] for c in filter_captures if c.get('stars') is not None and c['stars'] > 0]
+                if stars:
+                    stars_min = min(stars)
+                    stars_max = max(stars)
+                    stars_avg = np.mean(stars)
+                    stars_consistency = 1 - (np.std(stars) / max(np.mean(stars), 1))
+                    
+                    object_lines.append(f"   ⭐ Stars: {stars_min} → {stars_max} (avg {stars_avg:.0f}, consistency {stars_consistency:.2f})")
+                
+                # If no HFR data, provide technical explanation
+                if not hfrs:
+                    object_lines.append(f"   🔧 HFR: Data not available")
+                    object_lines.append(f"   📐 FWHM: Data not available")
+            
+            # Global guide performance
+            object_lines.append(f"   📈 Guide: {avg_distance:.2f}″ {emoji}{quality}")
+            object_lines.append(f"   📋 Sub-sessions: {total_sub_sessions}")
+            
+            # Show detailed sub-sessions with all stats
+            sub_sessions = analysis.get('sub_sessions', [])
+            for sub in sub_sessions:
+                sub_id = sub.get('sub_session_id', 0)
+                start_time = sub.get('start_time_formatted', '??:??')
+                end_time = sub.get('end_time_formatted', '??:??')
+                capture_count = sub.get('capture_count', 0)
+                sub_exposure = int(sub.get('exposure_time', 0))
+                duration_minutes = sub.get('duration_minutes', 0)
+                
+                # Format duration for sub-session
+                if duration_minutes >= 60:
+                    hours = int(duration_minutes / 60)
+                    mins = int(duration_minutes % 60)
+                    if mins > 0:
+                        sub_duration_str = f"{hours}h {mins}m"
+                    else:
+                        sub_duration_str = f"{hours}h"
+                else:
+                    sub_duration_str = f"{duration_minutes:.0f}m"
+                
+                # Sub-session header
+                sub_format = f"{capture_count}×{sub_exposure}s"
+                object_lines.append(f"     #{sub_id}: {start_time}→{end_time} ({sub_duration_str}) | {sub_format}")
+                
+                # Sub-session guide stats
+                sub_guide = sub.get('guide_stats', {})
+                sub_avg_distance = sub_guide.get('avg_distance', 0)
+                sub_quality = sub_guide.get('guide_quality', 'No Data')
+                guide_measurements = sub_guide.get('measurements', 0)
+                
+                if sub_avg_distance > 0:
+                    sub_emoji = quality_emoji.get(sub_quality, '⚪')
+                    object_lines.append(f"          📈 Guide: {sub_avg_distance:.2f}″ {sub_emoji}{sub_quality}")
+                else:
+                    object_lines.append(f"          📈 Guide: No data available")
+                
+                # Calculate real sub-session capture quality stats from individual captures
+                sub_captures = sub.get('captures', [])
+                if sub_captures:
+                    # Calculate HFR statistics for this sub-session 
+                    sub_hfrs = [c['hfr'] for c in sub_captures if c.get('hfr') is not None and c['hfr'] > 0.1]
+                    if sub_hfrs:
+                        sub_hfr_min = min(sub_hfrs)
+                        sub_hfr_max = max(sub_hfrs)
+                        sub_hfr_avg = np.mean(sub_hfrs)
+                        
+                        object_lines.append(f"          🔧 HFR: {sub_hfr_min:.2f} → {sub_hfr_max:.2f} (avg {sub_hfr_avg:.2f})")
+                        object_lines.append(f"          📐 FWHM: {sub_hfr_min*1.2:.2f} → {sub_hfr_max*1.2:.2f} (avg {sub_hfr_avg*1.2:.2f})")
+                    else:
+                        object_lines.append(f"          🔧 HFR: No measurements in sub-session")
+                        object_lines.append(f"          📐 FWHM: No measurements in sub-session")
+                    
+                    # Calculate Stars statistics for this sub-session
+                    sub_stars = [c['stars'] for c in sub_captures if c.get('stars') is not None and c['stars'] > 0]
+                    if sub_stars:
+                        sub_stars_min = min(sub_stars)
+                        sub_stars_max = max(sub_stars)
+                        sub_stars_avg = np.mean(sub_stars)
+                        sub_stars_consistency = 1 - (np.std(sub_stars) / max(np.mean(sub_stars), 1))
+                        
+                        object_lines.append(f"         ⭐ Stars: {sub_stars_min} → {sub_stars_max} (avg {sub_stars_avg:.0f}, consistency {sub_stars_consistency:.2f})")
+                    else:
+                        object_lines.append(f"         ⭐ Stars: Data not available")
+                else:
+                    object_lines.append(f"          🔧 HFR: No capture data")
+                    object_lines.append(f"          📐 FWHM: No capture data")
+                    object_lines.append(f"         ⭐ Stars: No capture data")
+            
+            # Add spacing between filters
+            object_lines.append("")
+        
+        # Create block for this object (with all its filters)
+        block_content = "\n".join(object_lines)
+        blocks.append({
+            'object_name': object_name,
+            'content': block_content,
+            'char_count': len(block_content),
+            'priority': total_obj_captures,  # For sorting by total captures
+            'filter_count': len(filters_data)
+        })
+    
+    return blocks
+
+def generate_filter_analysis_summary(filter_analysis: Dict[str, Any], capture_summary: Dict = None) -> str:
+    """Generate comprehensive capture details with HFR, FWHM, Stars and Guide data."""
+    blocks = generate_filter_analysis_blocks(filter_analysis, capture_summary)
+    if not blocks:
+        return ""
+    
+    lines = ["📊 **Capture Details**"]
+    for block in blocks:
+        lines.append("")
+        lines.append(block['content'])
+    
+    return "\n".join(lines)
+
+def split_filter_analysis_intelligently(filter_analysis: Dict[str, Any], header: str = "📊 **Capture Details**") -> List[str]:
+    """Split filter analysis into multiple messages, cutting cleanly between objects/filters."""
+    blocks = generate_filter_analysis_blocks(filter_analysis)
+    if not blocks:
+        return [f"{header}\n\nNo filter data available."]
+    
+    messages = []
+    current_message_lines = [header, ""]
+    current_char_count = len(header) + 2  # +2 for newlines
+    
+    for i, object_block in enumerate(blocks):
+        object_content = object_block['content']
+        object_char_count = len(object_content)
+        
+        # Calculate total if we add this object to current message
+        potential_total = current_char_count + object_char_count + 2  # +2 for newlines
+        
+        # If adding this object would exceed Discord limit, finalize current message
+        if potential_total > 1900 and len(current_message_lines) > 2:  # More than just header
+            # Finalize current message
+            messages.append('\n'.join(current_message_lines))
+            
+            # Start new message
+            message_number = len(messages) + 1
+            current_message_lines = [f"{header} ({message_number})", "", object_content]
+            current_char_count = len(f"{header} ({message_number})") + 2 + object_char_count
+        else:
+            # Add object to current message
+            if len(current_message_lines) > 2:  # Not first object in message
+                current_message_lines.append("")  # Add spacing between objects
+                current_char_count += 1
+            
+            current_message_lines.append(object_content)
+            current_char_count += object_char_count
+    
+    # Add final message if it has content
+    if len(current_message_lines) > 2:
+        messages.append('\n'.join(current_message_lines))
+    
+    return messages if messages else [f"{header}\n\nNo filter data available."]
+
+def _split_object_by_filters(object_block: Dict[str, Any], header: str, existing_messages_count: int) -> List[str]:
+    """Split a large object block into multiple messages by separating filters."""
+    object_name = object_block['object_name']
+    object_content = object_block['content']
+    
+    # Parse the object content to separate by filters
+    lines = object_content.split('\n')
+    
+    messages = []
+    current_filter_lines = []
+    current_char_count = 0
+    
+    # Find object header line
+    object_header = ""
+    filter_blocks = []
+    current_filter_block = []
+    
+    in_filter = False
+    
+    for line in lines:
+        if line.startswith('🎯 **'):
+            object_header = line
+            continue
+        elif line.startswith('📌') and 'Filter' in line:
+            # New filter starts
+            if current_filter_block:
+                # Save previous filter
+                filter_blocks.append('\n'.join(current_filter_block))
+            current_filter_block = [line]
+            in_filter = True
+        elif in_filter and line.strip():
+            current_filter_block.append(line)
+        elif not line.strip() and in_filter:
+            # Empty line might be end of filter or just spacing
+            current_filter_block.append(line)
+    
+    # Add last filter
+    if current_filter_block:
+        filter_blocks.append('\n'.join(current_filter_block))
+    
+    # Now split filters across messages
+    current_message_lines = []
+    if existing_messages_count == 0:
+        current_message_lines = [header, "", object_header]
+        current_char_count = len('\n'.join(current_message_lines))
+    else:
+        message_number = existing_messages_count + 1
+        current_message_lines = [f"{header} ({message_number})", "", object_header]
+        current_char_count = len('\n'.join(current_message_lines))
+    
+    for i, filter_block in enumerate(filter_blocks):
+        filter_with_spacing = f"\n{filter_block}"
+        filter_char_count = len(filter_with_spacing)
+        
+        # Check if adding this filter would exceed Discord limit
+        if current_char_count + filter_char_count > 1900:
+            # Finalize current message
+            if len(current_message_lines) > 2:  # More than just header + object
+                messages.append('\n'.join(current_message_lines))
+            
+            # Start new message
+            message_number = existing_messages_count + len(messages) + 1
+            current_message_lines = [f"{header} ({message_number})", "", f"🎯 **{object_name}** (continued)"]
+            current_char_count = len('\n'.join(current_message_lines))
+        
+        # Add filter to current message
+        current_message_lines.append("")
+        current_message_lines.append(filter_block.strip())
+        current_char_count += filter_char_count
+    
+    # Add final message
+    if len(current_message_lines) > 2:
+        messages.append('\n'.join(current_message_lines))
+    
+    return messages
+
+def generate_filter_guide_summary(filter_guide_stats: Dict[str, Any]) -> str:
+    """Generate guiding performance summary by filter - LEGACY COMPATIBILITY."""
+    if not filter_guide_stats:
+        return ""
+    
+    lines = ["🎯 **Guiding by Filter (Legacy)**"]
+    
+    # Sort filters by total measurements (most used first)
+    sorted_filters = sorted(filter_guide_stats.items(), 
+                          key=lambda x: x[1].get('total_measurements', 0), reverse=True)
+    
+    for filter_name, stats in sorted_filters:
+        if stats.get('total_measurements', 0) == 0:
+            continue
+            
+        avg_distance = stats.get('avg_distance', 0)
+        quality = stats.get('guide_quality', 'Unknown')
+        total_measurements = stats.get('total_measurements', 0)
+        sessions_count = stats.get('total_sessions', 0)
+        
+        # Quality emoji
+        quality_emoji = {
+            'Excellent': '🟢',
+            'Good': '🟡', 
+            'Average': '🟠',
+            'Poor': '🔴',
+            'No Data': '⚪'
+        }
+        emoji = quality_emoji.get(quality, '⚪')
+        
+        lines.append(f"🔍 **{filter_name}**: {avg_distance:.2f}″ {emoji}{quality}")
+        lines.append(f"   📊 {total_measurements} points, {sessions_count} sessions")
+        
+        # Add RMS if available and meaningful
+        avg_rms = stats.get('avg_rms', 0)
+        if avg_rms > 0:
+            lines.append(f"   📈 RMS: {avg_rms:.2f}″")
+    
+    return "\n".join(lines)
+
+def generate_detailed_filter_sessions(detailed_sessions: Dict[str, List[Dict]]) -> str:
+    """Generate detailed session breakdown by filter - NEW FEATURE."""
+    if not detailed_sessions:
+        return ""
+    
+    lines = ["📁 **Session Details by Filter**"]
+    
+    # Sort filters by total capture count
+    filter_totals = {}
+    for filter_name, sessions in detailed_sessions.items():
+        total_captures = sum(s.get('capture_count', 0) for s in sessions)
+        filter_totals[filter_name] = total_captures
+    
+    sorted_filters = sorted(filter_totals.items(), key=lambda x: x[1], reverse=True)
+    
+    for filter_name, total_caps in sorted_filters:
+        if total_caps == 0:
+            continue
+            
+        sessions = detailed_sessions[filter_name]
+        lines.append(f"")
+        lines.append(f"🎯 **{filter_name} Filter** ({len(sessions)} sessions, {total_caps} captures):")
+        
+        # Sort sessions by capture count (longest first)
+        sorted_sessions = sorted(sessions, key=lambda x: x.get('capture_count', 0), reverse=True)
+        
+        for i, session in enumerate(sorted_sessions):
+            session_idx = session.get('session_index', 0)
+            capture_count = session.get('capture_count', 0)
+            duration_min = session.get('duration_minutes', 0)
+            guide_points = session.get('guide_data_points', 0)
+            
+            # Format duration
+            if duration_min >= 60:
+                duration_str = f"{duration_min/60:.1f}h"
+            else:
+                duration_str = f"{duration_min:.0f}m"
+            
+            lines.append(f"  📋 Session {session_idx + 1}: {capture_count} captures, {duration_str}")
+            
+            # Add guide performance if available
+            guide_stats = session.get('guide_stats', {})
+            if guide_stats and guide_stats.get('avg_distance', 0) > 0:
+                avg_distance = guide_stats['avg_distance']
+                quality = guide_stats.get('guide_quality', 'Unknown')
+                lines.append(f"     🎯 Guide: {avg_distance:.2f}″ ({quality}, {guide_points} pts)")
+            elif guide_points == 0:
+                lines.append(f"     📊 No guiding data")
     
     return "\n".join(lines)
 

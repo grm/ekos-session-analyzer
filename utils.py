@@ -24,11 +24,45 @@ def setup_logging(verbose=False):
     )
 
 def send_discord_message(webhook_url, message):
-    """Send a message to Discord via webhook."""
-    payload = {"content": message}
+    """Send a message to Discord via webhook with validation."""
+    # Validate and clean the message
+    cleaned_message = validate_discord_message(message)
+    
+    payload = {"content": cleaned_message}
     response = requests.post(webhook_url, json=payload)
     response.raise_for_status()
-    logging.debug(f"Discord message sent successfully")
+    logging.debug(f"Discord message sent successfully (length: {len(cleaned_message)})")
+
+def validate_discord_message(message, allow_oversized=False):
+    """Validate and clean Discord message to prevent 400 errors."""
+    if not message:
+        return "Empty message"
+    
+    # Clean the message
+    cleaned = message
+    
+    # Remove control characters except newlines and tabs
+    import re
+    cleaned = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', cleaned)
+    
+    # Handle oversized messages based on allow_oversized flag
+    if len(cleaned) > 2000:
+        if allow_oversized:
+            # Let the caller handle message splitting - just log the warning
+            logging.warning(f"Message too long ({len(cleaned)} chars), needs splitting")
+        else:
+            # Legacy behavior: truncate with warning
+            logging.warning(f"Message too long ({len(cleaned)} chars), truncating...")
+            cleaned = cleaned[:1950] + "\n\n⚠️ Message truncated (too long)"
+    
+    # Ensure message is not empty after cleaning
+    if not cleaned.strip():
+        cleaned = "⚠️ Message content unavailable after cleaning"
+    
+    # Log message stats for debugging
+    logging.debug(f"Message validation: {len(cleaned)} chars, {cleaned.count(chr(10))} lines")
+    
+    return cleaned
 
 def send_discord_message_with_image(webhook_url, message, image_path=None):
     """Send a message to Discord via webhook with optional image attachment."""

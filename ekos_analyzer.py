@@ -1,6 +1,6 @@
 """
-Ekos/KStars Analyze File Parser
-Parses .analyze files from KStars/Ekos for session analysis
+Enhanced Ekos/KStars Analyze File Parser
+Parses .analyze files from KStars/Ekos for session analysis with improved HFR, FWHM and guide data calculation
 """
 import os
 import re
@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Any
 import glob
+import math
 
 class EkosAnalyzer:
     def __init__(self, analyze_dir: str = None):
@@ -54,7 +55,7 @@ class EkosAnalyzer:
         return sorted(analyze_files)
     
     def parse_analyze_file(self, filepath: str) -> Dict[str, Any]:
-        """Parse a single .analyze file and extract session data."""
+        """Parse a single .analyze file and extract session data with enhanced HFR/FWHM extraction."""
         session_data = {
             'filepath': filepath,
             'session_start': None,
@@ -147,13 +148,25 @@ class EkosAnalyzer:
                         
                 elif event_type == 'CaptureComplete':
                     if len(parts) >= 6:
+                        # Parse stars count - at index 7 based on actual Ekos format
+                        stars_value = None
+                        if len(parts) > 7:
+                            try:
+                                stars_candidate = int(parts[7])
+                                if stars_candidate > 0:  # Valid star count
+                                    stars_value = stars_candidate
+                            except (ValueError, IndexError):
+                                pass
+                        
                         capture_data = {
                             'timestamp': timestamp,
                             'event': 'complete',
                             'exposure': float(parts[2]),
                             'filter': parts[3],
-                            'hfr': float(parts[4]) if parts[4] != '-1.000' else None,
-                            'stars': int(parts[6]) if len(parts) > 6 and parts[6] != '-1' else None
+                            'hfr': None,  # Will be filled from autofocus data later
+                            'fwhm': None,  # Will be calculated from HFR
+                            'stars': stars_value,
+                            'filepath': parts[5] if len(parts) > 5 else None
                         }
                         session_data['captures'].append(capture_data)
                         
@@ -176,21 +189,31 @@ class EkosAnalyzer:
                         
                 elif event_type == 'AutofocusComplete':
                     if len(parts) >= 6:
-                        # Parse autofocus result
+                        # The HFR data is actually in parts[6], not the last part
+                        # Format: AutofocusComplete,timestamp,temp,step,reason,filter,HFR_DATA,other_sections...
+                        hfr_data_section = parts[6] if len(parts) > 6 else None
+                        
+                        # Parse autofocus result with enhanced HFR extraction
                         af_data = {
                             'timestamp': timestamp,
                             'event': 'complete',
                             'temperature': float(parts[2]),
                             'step': int(parts[3]),
                             'filter': parts[5],
-                            'solution': parts[-1] if len(parts) > 6 else None
+                            'solution': parts[-1] if len(parts) > 6 else None,
+                            'hfr_data_raw': hfr_data_section,  # Raw HFR data section
+                            'hfr_values': [],  # Will store all HFR measurements
+                            'best_hfr': None,  # Best HFR from the autofocus run
+                            'focus_position': None
                         }
                         
-                        # Extract HFR from solution string if available
-                        if af_data['solution']:
-                            hfr_match = re.search(r'Solution: (\d+)', af_data['solution'])
-                            if hfr_match:
-                                af_data['focus_position'] = int(hfr_match.group(1))
+                        # Enhanced HFR extraction from HFR data section
+                        if hfr_data_section and '|' in hfr_data_section:
+                            af_data = self._extract_hfr_from_data_section(af_data, hfr_data_section)
+                        
+                        # Also try to extract from solution string as fallback
+                        if not af_data.get('best_hfr') and af_data['solution']:
+                            af_data = self._extract_hfr_from_autofocus(af_data)
                                 
                         session_data['autofocus_sessions'].append(af_data)
                 
@@ -244,12 +267,296 @@ class EkosAnalyzer:
             
         return session_data
     
+    def _extract_hfr_from_autofocus(self, af_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Enhanced HFR extraction from autofocus solution string."""
+        solution_str = af_data['solution']
+        
+        if not solution_str:
+            return af_data
+        
+        # Extract focus position from solution
+        focus_match = re.search(r'Solution: (\d+)', solution_str)
+        if focus_match:
+            af_data['focus_position'] = int(focus_match.group(1))
+        
+        # Parse the detailed autofocus data from the actual file format
+        # Example: 22218|1.708|1.708|0|22198|1.820|1.820|0|22178|2.002|2.002|1|...
+        if '|' in solution_str:
+            # The HFR data is in the 6th field (index 5) of the comma-separated parts
+            # Format: AutofocusComplete,timestamp,temp,step,reason,filter,HFR_DATA,other_data...
+            parts = solution_str.split(',')
+            
+            # Look for the part that contains the HFR measurements (should be early in the string)
+            hfr_section = None
+            for i, part in enumerate(parts):
+                if '|' in part and len(part.split('|')) >= 12:  # Should have many measurements (at least 3 groups of 4)
+                    # Check if this looks like HFR data (contains numbers in the right format)
+                    test_parts = part.split('|')
+                    try:
+                        # Test if first few elements can be parsed as position|hfr|hfr|outlier
+                        int(test_parts[0])  # position
+                        float(test_parts[1])  # hfr
+                        float(test_parts[2])  # hfr (duplicate)
+                        int(test_parts[3])   # outlier flag
+                        hfr_section = part
+                        logging.debug(f"Found HFR section at index {i}: {part[:100]}...")
+                        break
+                    except (ValueError, IndexError):
+                        continue
+            
+            if hfr_section:
+                measurements = hfr_section.split('|')
+                logging.debug(f"Processing {len(measurements)} measurement values")
+                
+                # Parse measurements in groups of 4: position, hfr, hfr_weight, outlier
+                for i in range(0, len(measurements) - 3, 4):
+                    try:
+                        position = int(measurements[i])
+                        hfr = float(measurements[i + 1])
+                        hfr_weight = float(measurements[i + 2])
+                        outlier = int(measurements[i + 3])
+                        
+                        # Only include valid HFR measurements (not outliers, reasonable range)
+                        if outlier == 0 and 0.5 <= hfr <= 20.0:
+                            af_data['hfr_values'].append({
+                                'position': position,
+                                'hfr': hfr,
+                                'weight': hfr_weight
+                            })
+                            logging.debug(f"Added HFR measurement: pos={position}, hfr={hfr:.3f}, outlier={outlier}")
+                    except (ValueError, IndexError) as e:
+                        logging.debug(f"Error parsing measurement at index {i}: {e}")
+                        continue
+        
+        # Find the best HFR (minimum value from valid measurements)
+        if af_data['hfr_values']:
+            best_measurement = min(af_data['hfr_values'], key=lambda x: x['hfr'])
+            af_data['best_hfr'] = best_measurement['hfr']
+            
+            # If we have a focus position, try to find the HFR at that position
+            if af_data['focus_position']:
+                for measurement in af_data['hfr_values']:
+                    if measurement['position'] == af_data['focus_position']:
+                        af_data['best_hfr'] = measurement['hfr']
+                        logging.debug(f"Using HFR at solution position {af_data['focus_position']}: {af_data['best_hfr']:.3f}")
+                        break
+            
+            logging.debug(f"Extracted {len(af_data['hfr_values'])} HFR measurements, best: {af_data['best_hfr']:.3f}")
+        else:
+            logging.debug(f"No valid HFR measurements found in autofocus data")
+        
+        return af_data
+    
+    def _extract_hfr_from_data_section(self, af_data: Dict[str, Any], hfr_data_section: str) -> Dict[str, Any]:
+        """Extract HFR values directly from the HFR data section."""
+        if not hfr_data_section or '|' not in hfr_data_section:
+            return af_data
+        
+        # Extract focus position from solution string if available
+        if af_data.get('solution'):
+            focus_match = re.search(r'Solution: (\d+)', af_data['solution'])
+            if focus_match:
+                af_data['focus_position'] = int(focus_match.group(1))
+        
+        measurements = hfr_data_section.split('|')
+        logging.debug(f"Processing HFR data section with {len(measurements)} values")
+        
+        # Parse measurements in groups of 4: position, hfr, hfr_weight, outlier
+        for i in range(0, len(measurements) - 3, 4):
+            try:
+                position = int(measurements[i])
+                hfr = float(measurements[i + 1])
+                hfr_weight = float(measurements[i + 2])
+                outlier = int(measurements[i + 3])
+                
+                # Only include valid HFR measurements (not outliers, reasonable range)
+                if outlier == 0 and 0.5 <= hfr <= 20.0:
+                    af_data['hfr_values'].append({
+                        'position': position,
+                        'hfr': hfr,
+                        'weight': hfr_weight
+                    })
+                    logging.debug(f"Added HFR measurement: pos={position}, hfr={hfr:.3f}, outlier={outlier}")
+            except (ValueError, IndexError) as e:
+                logging.debug(f"Error parsing HFR measurement at index {i}: {e}")
+                continue
+        
+        # Find the best HFR (minimum value from valid measurements)
+        if af_data['hfr_values']:
+            best_measurement = min(af_data['hfr_values'], key=lambda x: x['hfr'])
+            af_data['best_hfr'] = best_measurement['hfr']
+            
+            # If we have a focus position, try to find the HFR at that position
+            if af_data['focus_position']:
+                for measurement in af_data['hfr_values']:
+                    if measurement['position'] == af_data['focus_position']:
+                        af_data['best_hfr'] = measurement['hfr']
+                        logging.debug(f"Using HFR at solution position {af_data['focus_position']}: {af_data['best_hfr']:.3f}")
+                        break
+            
+            logging.debug(f"Extracted {len(af_data['hfr_values'])} HFR measurements from data section, best: {af_data['best_hfr']:.3f}")
+        else:
+            logging.debug(f"No valid HFR measurements found in data section")
+        
+        return af_data
+    
+    def _calculate_fwhm_from_hfr(self, hfr: float) -> float:
+        """Calculate FWHM from HFR using the standard conversion factor."""
+        if hfr is None or hfr <= 0:
+            return None
+        # FWHM ≈ HFR × 1.2 (approximate conversion factor)
+        return hfr * 1.2
+    
+    def _associate_autofocus_with_captures(self, session_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Enhanced association of autofocus HFR values with subsequent captures."""
+        if not session_data.get('autofocus_sessions') or not session_data.get('captures'):
+            return session_data
+        
+        # Get completed autofocus sessions sorted by timestamp
+        completed_autofocus = [af for af in session_data['autofocus_sessions'] if af['event'] == 'complete']
+        completed_autofocus.sort(key=lambda x: x['timestamp'])
+        
+        # Get completed captures sorted by timestamp
+        completed_captures = [c for c in session_data['captures'] if c['event'] == 'complete']
+        completed_captures.sort(key=lambda x: x['timestamp'])
+        
+        # For each autofocus session, associate HFR with subsequent captures
+        for af in completed_autofocus:
+            if not af.get('best_hfr'):
+                continue
+                
+            filter_name = af.get('filter', 'Unknown')
+            af_timestamp = af['timestamp']
+            best_hfr = af['best_hfr']
+            
+            # Find captures of the same filter that occur after this autofocus
+            # Use a more generous time window (up to next autofocus OR 2 hours)
+            next_af_timestamp = None
+            for next_af in completed_autofocus:
+                if (next_af['timestamp'] > af_timestamp and 
+                    next_af.get('filter') == filter_name):
+                    next_af_timestamp = next_af['timestamp']
+                    break
+            
+            # If no next autofocus, use a 2-hour window
+            if next_af_timestamp is None:
+                next_af_timestamp = af_timestamp + 7200  # 2 hours in seconds
+            
+            # Apply HFR to captures in this time window
+            captures_updated = 0
+            for capture in completed_captures:
+                if (capture['filter'] == filter_name and 
+                    capture['timestamp'] > af_timestamp and
+                    capture['timestamp'] < next_af_timestamp):
+                    
+                    # Update HFR and FWHM for all captures in the window
+                    capture['hfr'] = best_hfr
+                    capture['fwhm'] = self._calculate_fwhm_from_hfr(best_hfr)
+                    captures_updated += 1
+                    logging.debug(f"Associated HFR {best_hfr:.2f} and FWHM {capture['fwhm']:.2f} with {filter_name} capture at {capture['timestamp']}")
+            
+            logging.debug(f"Updated {captures_updated} captures with HFR from autofocus session at {af_timestamp}")
+        
+        return session_data
+    
+    def _calculate_sub_session_metrics(self, sub_session_captures: List[Dict], guide_data: List[Dict]) -> Dict[str, Any]:
+        """Calculate comprehensive metrics for a sub-session including HFR, FWHM, and guide stats."""
+        metrics = {
+            'hfr_stats': {'min': None, 'max': None, 'avg': None, 'measurements': 0},
+            'fwhm_stats': {'min': None, 'max': None, 'avg': None, 'measurements': 0},
+            'guide_stats': {'avg_distance': 0.0, 'avg_rms': 0.0, 'guide_quality': 'No Data', 'measurements': 0},
+            'star_stats': {'min': None, 'max': None, 'avg': None, 'consistency': 1.0}
+        }
+        
+        # Calculate HFR statistics
+        hfr_values = [c['hfr'] for c in sub_session_captures if c.get('hfr') is not None]
+        if hfr_values:
+            metrics['hfr_stats'] = {
+                'min': min(hfr_values),
+                'max': max(hfr_values),
+                'avg': sum(hfr_values) / len(hfr_values),
+                'measurements': len(hfr_values)
+            }
+        
+        # Calculate FWHM statistics
+        fwhm_values = [c['fwhm'] for c in sub_session_captures if c.get('fwhm') is not None]
+        if fwhm_values:
+            metrics['fwhm_stats'] = {
+                'min': min(fwhm_values),
+                'max': max(fwhm_values),
+                'avg': sum(fwhm_values) / len(fwhm_values),
+                'measurements': len(fwhm_values)
+            }
+        
+        # Calculate guide statistics
+        if guide_data:
+            # Calculate distance from dx,dy (more reliable than pre-calculated distance field)
+            calculated_distances = []
+            rms_values = []
+            
+            for g in guide_data:
+                dx = g.get('dx', 0)
+                dy = g.get('dy', 0)
+                distance = math.sqrt(dx**2 + dy**2)
+                calculated_distances.append(distance)
+                
+                if g.get('rms', 0) > 0:
+                    rms_values.append(g['rms'])
+            
+            # Filter outliers (guide corrections > 10 arcsec are usually spurious)
+            filtered_distances = [d for d in calculated_distances if d <= 10.0]
+            
+            if filtered_distances:
+                avg_distance = sum(filtered_distances) / len(filtered_distances)
+                avg_rms = sum(rms_values) / len(rms_values) if rms_values else 0.0
+                
+                # Determine guide quality
+                if avg_distance < 1.0:
+                    quality = "Excellent"
+                elif avg_distance < 2.0:
+                    quality = "Good"
+                elif avg_distance < 3.0:
+                    quality = "Average"
+                else:
+                    quality = "Poor"
+                
+                metrics['guide_stats'] = {
+                    'avg_distance': avg_distance,
+                    'avg_rms': avg_rms,
+                    'guide_quality': quality,
+                    'measurements': len(guide_data)
+                }
+        
+        # Calculate star count statistics
+        star_counts = [c['stars'] for c in sub_session_captures if c.get('stars') is not None]
+        if star_counts:
+            min_stars = min(star_counts)
+            max_stars = max(star_counts)
+            avg_stars = sum(star_counts) / len(star_counts)
+            
+            # Calculate consistency (how stable the star count is)
+            if max_stars > 0:
+                consistency = min_stars / max_stars
+            else:
+                consistency = 1.0
+            
+            metrics['star_stats'] = {
+                'min': min_stars,
+                'max': max_stars,
+                'avg': int(avg_stars),
+                'consistency': consistency
+            }
+        
+        return metrics
+    
     def aggregate_session_data(self, session_files: List[str]) -> Dict[str, Any]:
-        """Aggregate data from multiple session files."""
+        """Aggregate data from multiple session files with enhanced metrics calculation."""
         all_sessions = []
         
         for filepath in session_files:
             session_data = self.parse_analyze_file(filepath)
+            # Associate autofocus HFR values with captures
+            session_data = self._associate_autofocus_with_captures(session_data)
             if session_data['captures'] or session_data['autofocus_sessions']:
                 all_sessions.append(session_data)
                 
@@ -261,6 +568,7 @@ class EkosAnalyzer:
             'sessions': all_sessions,
             'total_captures': 0,
             'capture_summary': defaultdict(list),
+            'filter_analysis': {},  # Enhanced filter analysis with sub-sessions
             'temperature_stats': {},
             'autofocus_stats': {},
             'guide_stats': {},
@@ -282,66 +590,47 @@ class EkosAnalyzer:
         earliest_start = None
         latest_end = None
         
-        for session in all_sessions:
+        for session_idx, session in enumerate(all_sessions):
             # Collect captures
             completed_captures = [c for c in session['captures'] if c['event'] == 'complete']
             all_captures.extend(completed_captures)
             
-            # Group by object/filter - don't filter out captures without HFR/stars
+            # Extract object name for this session
+            obj_name = self._get_object_name_from_scheduler(session['scheduler_jobs']) or self._extract_object_name(session['filepath'])
+            
+            # Group captures by filter within this session for detailed analysis
             for capture in completed_captures:
-                # Try to extract object name from THIS session's scheduler jobs first, then fallback
-                obj_name = self._get_object_name_from_scheduler(session['scheduler_jobs']) or self._extract_object_name(session['filepath'])
                 key = (obj_name, capture['filter'])
                 aggregated['capture_summary'][key].append(capture)
             
-            # Collect temperature data
+            # Collect other data
             all_temperatures.extend(session['temperature_readings'])
-            
-            # Collect autofocus data
             all_autofocus.extend([af for af in session['autofocus_sessions'] if af['event'] == 'complete'])
-            
-            # Collect guide data
             all_guide_stats.extend(session['guide_stats'])
             all_guide_states.extend(session['guide_states'])
-            
-            # Collect alignment data
             all_align_states.extend(session['align_states'])
-            
-            # Collect scheduler/target data
             all_scheduler_jobs.extend(session['scheduler_jobs'])
-            
-            # Collect issues
             all_issues.extend(session['issues'])
             
             # Track session timing
-            logging.debug(f"Processing session timing for {session['filepath']}")
-            logging.debug(f"Session start: {session['session_start']}")
-            logging.debug(f"Captures count: {len(session['captures'])}")
-            
             if session['session_start']:
                 try:
-                    # Try different datetime formats
                     start_time = None
                     datetime_str = session['session_start']
                     
                     # Try with microseconds first
                     try:
                         start_time = datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S.%f')
-                        logging.debug(f"Parsed start time with microseconds: {start_time}")
                     except ValueError:
                         # Try without microseconds
                         try:
                             start_time = datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S')
-                            logging.debug(f"Parsed start time without microseconds: {start_time}")
                         except ValueError:
-                            logging.debug(f"Could not parse datetime: {datetime_str}")
-                            # Don't continue, just skip this session's timing
                             start_time = None
                     
                     if start_time:
                         if not earliest_start or start_time < earliest_start:
                             earliest_start = start_time
-                            logging.debug(f"Updated earliest start: {earliest_start}")
                             
                         # Estimate end time from last event
                         if session['captures']:
@@ -349,12 +638,26 @@ class EkosAnalyzer:
                             end_time = start_time + timedelta(seconds=last_capture_time)
                             if not latest_end or end_time > latest_end:
                                 latest_end = end_time
-                                logging.debug(f"Updated latest end: {latest_end}")
                 except Exception as e:
                     logging.debug(f"Error parsing session timing: {e}")
                     pass
         
         aggregated['total_captures'] = len(all_captures)
+        
+        # Build enhanced filter analysis with sub-sessions
+        aggregated['filter_analysis'] = self._build_enhanced_filter_analysis(
+            aggregated['capture_summary'], 
+            all_sessions
+        )
+        
+        # Calculate session duration
+        if earliest_start and latest_end:
+            duration = latest_end - earliest_start
+            aggregated['session_duration'] = {
+                'start': earliest_start,
+                'end': latest_end,
+                'duration_hours': duration.total_seconds() / 3600
+            }
         
         # Calculate temperature stats
         if all_temperatures:
@@ -366,26 +669,28 @@ class EkosAnalyzer:
                 'readings_count': len(temps)
             }
         
-        # Calculate autofocus stats
+        # Calculate enhanced autofocus stats
         if all_autofocus:
-            # Filter out invalid temperatures (Ekos default values)
             valid_temps = [af['temperature'] for af in all_autofocus if af['temperature'] > -999999]
+            hfr_values = [af['best_hfr'] for af in all_autofocus if af.get('best_hfr')]
+            
             aggregated['autofocus_stats'] = {
                 'sessions_count': len(all_autofocus),
-                'avg_temperature': sum(valid_temps) / len(valid_temps) if valid_temps else None
+                'avg_temperature': sum(valid_temps) / len(valid_temps) if valid_temps else None,
+                'avg_hfr': sum(hfr_values) / len(hfr_values) if hfr_values else None,
+                'best_hfr': min(hfr_values) if hfr_values else None,
+                'worst_hfr': max(hfr_values) if hfr_values else None
             }
         
-        # Calculate guide stats - CRUCIAL for astrophotography
+        # Calculate guide stats
         if all_guide_stats:
-            # Calculate distance from dx,dy (more reliable than pre-calculated distance field)
             calculated_distances = []
             for g in all_guide_stats:
                 dx = g.get('dx', 0)
                 dy = g.get('dy', 0)
-                distance = (dx**2 + dy**2)**0.5
+                distance = math.sqrt(dx**2 + dy**2)
                 calculated_distances.append(distance)
             
-            # Filter outliers (guide corrections > 10 arcsec are usually spurious)
             filtered_distances = [d for d in calculated_distances if d <= 10.0]
             rms_values = [g['rms'] for g in all_guide_stats if g.get('rms', 0) > 0]
             dx_values = [abs(g['dx']) for g in all_guide_stats]
@@ -421,39 +726,200 @@ class EkosAnalyzer:
                     targets.add(job['object_name'])
             aggregated['target_objects'] = list(targets)
         
-        # Calculate session duration - fallback to timestamps if no parsed datetime
-        if earliest_start and latest_end:
-            duration = latest_end - earliest_start
-            aggregated['session_duration'] = {
-                'start': earliest_start,
-                'end': latest_end,
-                'duration_hours': duration.total_seconds() / 3600
-            }
-        elif all_captures:
-            # Fallback: estimate duration from capture timestamps
-            timestamps = [c['timestamp'] for c in all_captures]
-            if timestamps:
-                min_ts = min(timestamps)
-                max_ts = max(timestamps)
-                duration_seconds = max_ts - min_ts
-                duration_hours = duration_seconds / 3600
-                
-                # Create approximate start/end times
-                now = datetime.utcnow()
-                approx_start = now - timedelta(seconds=max_ts)
-                approx_end = now - timedelta(seconds=min_ts)
-                
-                aggregated['session_duration'] = {
-                    'start': approx_start,
-                    'end': approx_end,
-                    'duration_hours': duration_hours
-                }
-                logging.debug(f"Estimated session duration from timestamps: {duration_hours:.2f} hours")
-        
         # Summarize issues
         aggregated['issues_summary'] = all_issues
         
         return aggregated
+    
+    def _build_enhanced_filter_analysis(self, capture_summary: Dict[Tuple[str, str], List[Dict]], 
+                                      all_sessions: List[Dict]) -> Dict[str, Any]:
+        """
+        Build enhanced filter analysis with sub-sessions detection, HFR/FWHM metrics, and guide correlation.
+        """
+        filter_analysis = {}
+        
+        # Group all captures by filter (ignoring object name for now)
+        filter_captures = defaultdict(list)
+        for (obj_name, filter_name), captures in capture_summary.items():
+            filter_captures[filter_name].extend(captures)
+        
+        # Create mapping of timestamps to guide data from all sessions
+        timestamp_to_guide = {}
+        for session in all_sessions:
+            for guide_point in session.get('guide_stats', []):
+                timestamp_to_guide[guide_point['timestamp']] = guide_point
+        
+        # Analyze each filter
+        for filter_name, all_filter_captures in filter_captures.items():
+            if not all_filter_captures:
+                continue
+                
+            # Sort captures by timestamp
+            sorted_captures = sorted(all_filter_captures, key=lambda x: x['timestamp'])
+            
+            # Detect temporal sub-sessions (gaps > 30 minutes = 1800 seconds)
+            sub_sessions = []
+            current_session = []
+            
+            for i, capture in enumerate(sorted_captures):
+                if i == 0:
+                    current_session = [capture]
+                else:
+                    time_gap = capture['timestamp'] - sorted_captures[i-1]['timestamp']
+                    if time_gap > 1800:  # 30 minutes gap = new sub-session
+                        # Finalize current sub-session
+                        if current_session:
+                            sub_sessions.append(current_session)
+                        current_session = [capture]
+                    else:
+                        current_session.append(capture)
+            
+            # Add the last sub-session
+            if current_session:
+                sub_sessions.append(current_session)
+            
+            # Analyze each sub-session with enhanced metrics
+            analyzed_sub_sessions = []
+            for i, sub_session_captures in enumerate(sub_sessions):
+                # Use capture completion timestamps for sub-session boundaries
+                start_ts = min(cap['timestamp'] for cap in sub_session_captures)
+                end_ts = max(cap['timestamp'] for cap in sub_session_captures)
+                
+                # Expand time window to include guide data during capture acquisition
+                # Look for corresponding CaptureStarting events to get the real start time
+                expanded_start_ts = start_ts
+                expanded_end_ts = end_ts
+                
+                # Find CaptureStarting events that correspond to our captures
+                for session in all_sessions:
+                    for capture_event in session.get('captures', []):
+                        if capture_event.get('event') == 'starting':
+                            # Find if this starting event has a corresponding complete event in our sub-session
+                            for completed_capture in sub_session_captures:
+                                # Match by filter and proximity (within reasonable time window)
+                                time_diff = abs(completed_capture['timestamp'] - capture_event['timestamp'])
+                                if (capture_event.get('filter') == completed_capture.get('filter') and
+                                    time_diff < 1200):  # Max 20 minutes between start and complete
+                                    expanded_start_ts = min(expanded_start_ts, capture_event['timestamp'])
+                
+                # Add buffer time (30 seconds before and after for guide settling)
+                guide_window_start = expanded_start_ts - 30
+                guide_window_end = expanded_end_ts + 30
+                duration_minutes = (end_ts - expanded_start_ts) / 60
+                
+                # Find corresponding guide data for this expanded sub-session window
+                sub_session_guide_data = []
+                for guide_point in timestamp_to_guide.values():
+                    if guide_window_start <= guide_point['timestamp'] <= guide_window_end:
+                        sub_session_guide_data.append(guide_point)
+                
+                # Calculate comprehensive metrics for this sub-session
+                metrics = self._calculate_sub_session_metrics(sub_session_captures, sub_session_guide_data)
+                
+                # Extract exposure time and calculate timing info
+                exposure_time = sub_session_captures[0]['exposure'] if sub_session_captures else 0
+                
+                # Create enhanced sub-session analysis
+                sub_session_analysis = {
+                    'sub_session_id': i + 1,
+                    'capture_count': len(sub_session_captures),
+                    'start_timestamp': start_ts,
+                    'end_timestamp': end_ts,
+                    'duration_minutes': duration_minutes,
+                    'exposure_time': exposure_time,
+                    'start_time_formatted': datetime.fromtimestamp(start_ts).strftime('%H:%M'),
+                    'end_time_formatted': datetime.fromtimestamp(end_ts).strftime('%H:%M'),
+                    'hfr_stats': metrics['hfr_stats'],
+                    'fwhm_stats': metrics['fwhm_stats'],
+                    'guide_stats': metrics['guide_stats'],
+                    'star_stats': metrics['star_stats'],
+                    'captures': sub_session_captures
+                }
+                
+                analyzed_sub_sessions.append(sub_session_analysis)
+            
+            # Calculate global stats for this filter across all sub-sessions
+            total_captures = len(all_filter_captures)
+            total_duration_minutes = sum(sub['duration_minutes'] for sub in analyzed_sub_sessions)
+            
+            # Calculate weighted average metrics across sub-sessions
+            total_hfr_measurements = sum(sub['hfr_stats']['measurements'] for sub in analyzed_sub_sessions)
+            total_fwhm_measurements = sum(sub['fwhm_stats']['measurements'] for sub in analyzed_sub_sessions)
+            total_guide_measurements = sum(sub['guide_stats']['measurements'] for sub in analyzed_sub_sessions)
+            
+            # Weighted averages for HFR
+            if total_hfr_measurements > 0:
+                weighted_avg_hfr = sum(sub['hfr_stats']['avg'] * sub['hfr_stats']['measurements'] 
+                                     for sub in analyzed_sub_sessions if sub['hfr_stats']['avg'] is not None) / total_hfr_measurements
+                all_hfr_values = []
+                for sub in analyzed_sub_sessions:
+                    for cap in sub['captures']:
+                        if cap.get('hfr') is not None:
+                            all_hfr_values.append(cap['hfr'])
+                min_hfr = min(all_hfr_values) if all_hfr_values else None
+                max_hfr = max(all_hfr_values) if all_hfr_values else None
+            else:
+                weighted_avg_hfr = None
+                min_hfr = None
+                max_hfr = None
+            
+            # Weighted averages for FWHM
+            if total_fwhm_measurements > 0:
+                weighted_avg_fwhm = sum(sub['fwhm_stats']['avg'] * sub['fwhm_stats']['measurements'] 
+                                      for sub in analyzed_sub_sessions if sub['fwhm_stats']['avg'] is not None) / total_fwhm_measurements
+                all_fwhm_values = []
+                for sub in analyzed_sub_sessions:
+                    for cap in sub['captures']:
+                        if cap.get('fwhm') is not None:
+                            all_fwhm_values.append(cap['fwhm'])
+                min_fwhm = min(all_fwhm_values) if all_fwhm_values else None
+                max_fwhm = max(all_fwhm_values) if all_fwhm_values else None
+            else:
+                weighted_avg_fwhm = None
+                min_fwhm = None
+                max_fwhm = None
+            
+            # Weighted averages for guide stats
+            if total_guide_measurements > 0:
+                weighted_avg_distance = sum(sub['guide_stats']['avg_distance'] * sub['guide_stats']['measurements'] 
+                                          for sub in analyzed_sub_sessions if sub['guide_stats']['measurements'] > 0) / total_guide_measurements
+                weighted_avg_rms = sum(sub['guide_stats']['avg_rms'] * sub['guide_stats']['measurements'] 
+                                     for sub in analyzed_sub_sessions if sub['guide_stats']['measurements'] > 0) / total_guide_measurements
+                overall_quality = self._calculate_guide_quality_from_distance([weighted_avg_distance])
+            else:
+                weighted_avg_distance = 0.0
+                weighted_avg_rms = 0.0
+                overall_quality = "No Data"
+            
+            # Create complete filter analysis
+            filter_analysis[filter_name] = {
+                'total_captures': total_captures,
+                'total_sub_sessions': len(analyzed_sub_sessions),
+                'total_duration_minutes': total_duration_minutes,
+                'total_duration_hours': total_duration_minutes / 60,
+                'exposure_time': analyzed_sub_sessions[0]['exposure_time'] if analyzed_sub_sessions else 0,
+                'sub_sessions': analyzed_sub_sessions,
+                'global_hfr_stats': {
+                    'avg': weighted_avg_hfr,
+                    'min': min_hfr,
+                    'max': max_hfr,
+                    'measurements': total_hfr_measurements
+                },
+                'global_fwhm_stats': {
+                    'avg': weighted_avg_fwhm,
+                    'min': min_fwhm,
+                    'max': max_fwhm,
+                    'measurements': total_fwhm_measurements
+                },
+                'global_guide_stats': {
+                    'avg_distance': weighted_avg_distance,
+                    'avg_rms': weighted_avg_rms,
+                    'guide_quality': overall_quality,
+                    'total_measurements': total_guide_measurements
+                }
+            }
+        
+        return filter_analysis
     
     def _calculate_guide_quality_from_distance(self, distances: List[float]) -> str:
         """Calculate guide quality rating from real distance calculations."""
@@ -463,28 +929,6 @@ class EkosAnalyzer:
         avg_distance = sum(distances) / len(distances)
         
         # Quality thresholds in arcseconds (for real calculated distances)
-        if avg_distance < 1.0:
-            return "Excellent"
-        elif avg_distance < 2.0:
-            return "Good"
-        elif avg_distance < 3.0:
-            return "Average"
-        else:
-            return "Poor"
-    
-    def _calculate_guide_quality(self, guide_stats: List[Dict]) -> str:
-        """Calculate guide quality rating from guide statistics."""
-        if not guide_stats:
-            return "Unknown"
-        
-        # Calculate average distance error (arcsec)
-        distances = [g['distance'] for g in guide_stats if g['distance'] > 0]
-        if not distances:
-            return "No Data"
-        
-        avg_distance = sum(distances) / len(distances)
-        
-        # Quality thresholds in arcseconds
         if avg_distance < 1.0:
             return "Excellent"
         elif avg_distance < 2.0:
