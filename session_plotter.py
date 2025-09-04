@@ -400,10 +400,43 @@ class SessionPlotter:
         ax.legend(loc='upper right', framealpha=0.9)
     
     def _format_time_axis(self, ax):
-        """Format the time axis (only for bottom subplot)."""
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-        ax.xaxis.set_major_locator(mdates.HourLocator(interval=1))
-        ax.xaxis.set_minor_locator(mdates.MinuteLocator(interval=30))
+        """Format the time axis (only for bottom subplot) with adaptive tick spacing."""
+        # Get the data range to determine appropriate tick spacing
+        xlim = ax.get_xlim()
+        time_range_days = (xlim[1] - xlim[0])  # matplotlib date units
+        
+        # Adaptive tick spacing based on session duration
+        if time_range_days > 7:  # > 7 days
+            # Very long sessions: daily ticks
+            ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
+            ax.xaxis.set_minor_locator(mdates.HourLocator(interval=12))
+        elif time_range_days > 2:  # 2-7 days
+            # Multi-day sessions: 12-hour ticks
+            ax.xaxis.set_major_locator(mdates.HourLocator(interval=12))
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d %H:%M'))
+            ax.xaxis.set_minor_locator(mdates.HourLocator(interval=6))
+        elif time_range_days > 1:  # 1-2 days
+            # Long single sessions: 6-hour ticks
+            ax.xaxis.set_major_locator(mdates.HourLocator(interval=6))
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+            ax.xaxis.set_minor_locator(mdates.HourLocator(interval=2))
+        elif time_range_days > 0.5:  # 12-24 hours
+            # Extended sessions: 3-hour ticks
+            ax.xaxis.set_major_locator(mdates.HourLocator(interval=3))
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+            ax.xaxis.set_minor_locator(mdates.HourLocator(interval=1))
+        elif time_range_days > 0.25:  # 6-12 hours
+            # Long sessions: 2-hour ticks
+            ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+            ax.xaxis.set_minor_locator(mdates.MinuteLocator(interval=30))
+        else:  # < 6 hours
+            # Normal sessions: hourly ticks
+            ax.xaxis.set_major_locator(mdates.HourLocator(interval=1))
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+            ax.xaxis.set_minor_locator(mdates.MinuteLocator(interval=30))
+        
         plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
         ax.set_xlabel('Time', fontsize=11)
     
