@@ -861,7 +861,7 @@ def generate_filter_analysis_blocks(filter_analysis: Dict[str, Any], capture_sum
                 else:
                     object_lines.append(f"          🔧 HFR: No capture data")
                     object_lines.append(f"          📐 FWHM: No capture data")
-                    object_lines.append(f"         ⭐ Stars: No capture data")
+                    object_lines.append(f"          ⭐ Stars: No capture data")
             
             # Add spacing between filters
             object_lines.append("")
