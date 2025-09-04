@@ -278,7 +278,7 @@ class SessionPlotter:
                 ax.plot(times, hfrs, c=color, alpha=0.5, linewidth=1, label=f'{filt} filter')
         
         ax.set_ylabel('HFR (pixels)', fontsize=11, color=self.colors['hfr'])
-        ax.set_title('🔧 Image Quality (HFR) Evolution', fontsize=12, pad=10)
+        ax.set_title('Image Quality (HFR) Evolution', fontsize=12, pad=10)
         ax.tick_params(axis='y', labelcolor=self.colors['hfr'])
         
         # Add HFR statistics
@@ -326,7 +326,7 @@ class SessionPlotter:
             ax.axhspan(2.0, 3.0, alpha=0.1, color='orange', label='Average (2-3″)')
         
         ax.set_ylabel('Guiding Error (arcsec)', fontsize=11, color=self.colors['guiding'])
-        ax.set_title('📈 Guiding Performance Evolution', fontsize=12, pad=10)
+        ax.set_title('Guiding Performance Evolution', fontsize=12, pad=10)
         ax.tick_params(axis='y', labelcolor=self.colors['guiding'])
         
         # Add guiding statistics
@@ -386,7 +386,7 @@ class SessionPlotter:
         ax.fill_between(times, temps, alpha=0.2, color=self.colors['temperature'])
         
         ax.set_ylabel('Temperature (°C)', fontsize=11, color=self.colors['temperature'])
-        ax.set_title('🌡️ Temperature Evolution', fontsize=12, pad=10)
+        ax.set_title('Temperature Evolution', fontsize=12, pad=10)
         ax.tick_params(axis='y', labelcolor=self.colors['temperature'])
         
         # Add temperature statistics
@@ -424,7 +424,7 @@ class SessionPlotter:
         else:
             duration_str = ""
         
-        fig.suptitle(f'📡 Astrophotography Session Analysis - {session_date} {duration_str}', 
+        fig.suptitle(f'Astrophotography Session Analysis - {session_date} {duration_str}', 
                     fontsize=14, fontweight='bold', y=0.98)
         
         # Add performance summary at the bottom
@@ -433,7 +433,7 @@ class SessionPlotter:
         if temporal_data['hfr_data']:
             hfr_values = [p['hfr'] for p in temporal_data['hfr_data']]
             hfr_avg = np.mean(hfr_values)
-            summary_parts.append(f'🔧 HFR: {hfr_avg:.2f}px')
+            summary_parts.append(f'HFR: {hfr_avg:.2f}px')
         
         if temporal_data['guiding_data']:
             errors = [p['error'] for p in temporal_data['guiding_data']]
@@ -442,17 +442,17 @@ class SessionPlotter:
                 guide_avg = np.mean(errors_filtered)
                 # Use pixel-scale-based quality assessment
                 guide_quality = self._calculate_guide_quality_from_distance(guide_avg)
-                summary_parts.append(f'📈 Guide: {guide_avg:.2f}″ ({guide_quality})')
+                summary_parts.append(f'Guide: {guide_avg:.2f}″ ({guide_quality})')
         
         if temporal_data['temperature_data']:
             temps = [p['temperature'] for p in temporal_data['temperature_data']]
             temp_range = max(temps) - min(temps)
             stability = "Stable" if temp_range < 2 else "Variable"
-            summary_parts.append(f'🌡️ Temp: {stability} (Δ{temp_range:.1f}°C)')
+            summary_parts.append(f'Temp: {stability} (Δ{temp_range:.1f}°C)')
         
         if temporal_data['autofocus_events']:
             af_count = len(temporal_data['autofocus_events'])
-            summary_parts.append(f'🎯 Autofocus: {af_count} sessions')
+            summary_parts.append(f'Autofocus: {af_count} sessions')
         
         if summary_parts:
             fig.text(0.5, 0.02, ' | '.join(summary_parts), ha='center', 
