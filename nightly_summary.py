@@ -143,8 +143,12 @@ def main():
                     send_discord_message(webhook_url, summaries[0])
                     print("✅ Summary sent to Discord.")
         
-        # Clean up plot file after sending/dry-run
-        if plot_path and os.path.exists(plot_path):
+        # Clean up plot file after sending/dry-run (configurable for dry-run)
+        should_cleanup = True
+        if args.dry_run:
+            should_cleanup = config.get('plotting', {}).get('cleanup_after_dry_run', True)
+        
+        if plot_path and os.path.exists(plot_path) and should_cleanup:
             try:
                 os.remove(plot_path)
                 logging.debug(f"Cleaned up plot file: {plot_path}")
@@ -152,6 +156,8 @@ def main():
                     print(f"🧹 Plot file cleaned up: {plot_path}")
             except Exception as e:
                 logging.warning(f"Could not remove plot file {plot_path}: {e}")
+        elif plot_path and os.path.exists(plot_path) and not should_cleanup:
+            print(f"📁 Plot file kept: {plot_path}")
         
     except Exception as e:
         logging.error(f"Analysis failed: {e}")

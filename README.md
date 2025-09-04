@@ -251,27 +251,57 @@ Add to your crontab for daily summary at 8 AM:
 0 8 * * * cd /path/to/astro-session-analyser && pipenv run python nightly_summary.py -c config.yml
 ```
 
-## 📊 What Gets Analyzed
+## 📊 Example Output
 
-### All Levels Include
-- **Captures**: Count, duration, HFR, FWHM, star statistics by filter
-- **Guiding Performance**: Error measurements, quality assessment, RA/DEC breakdown
-- **Session Conditions**: Temperature stability, mount tracking status
-- **Autofocus**: Session count, temperature correlation, focus stability
-- **Issues**: Aborted captures, session problems with alerts
+### Discord Message with Temporal Plot
 
-### DETAILED Level Adds
-- **Sub-Session Analysis**: Detailed breakdown of imaging sessions by filter
-- **Quality Metrics**: HFR stability, seeing conditions, trend analysis
-- **Temperature Correlations**: Statistical analysis of temperature effects on HFR
-- **Advanced Statistics**: Standard deviations, consistency scores, correlations
-- **Comprehensive Alerts**: Performance warnings and optimization recommendations
+Here's an example of what gets sent to Discord, including both the comprehensive text summary and temporal visualization:
 
-### Temporal Plotting (Optional)
-- **HFR Evolution**: Focus quality over time with autofocus markers
-- **Guiding Performance**: Error trends and stability analysis
-- **Temperature Effects**: Thermal conditions impact on imaging quality
-- **Multi-Filter Visualization**: Color-coded analysis by filter type
+![Example Session Plot](example_plot.png)
+
+**Example Discord Message:**
+```
+🔭 Ekos Session Summary
+📅 2025-09-04 07:49 UTC
+
+🌙 Session Overview
+📸 Total Captures: 7
+⏰ Duration: 07:00 → 08:38 (1h 38m)
+🎯 Objects: 1 | 🔍 Filters: 3 (H, O, S)
+
+🌟 Guiding Performance
+📊 Measurements: 22
+🎯 Avg Error: 1.21″
+🟡 Guide Quality: Good
+📈 RA: 0.95″ | DEC: 0.74″
+
+📊 Capture Details
+
+🎯 NGC 7380
+📌 H Filter (4×600s, 58m)
+   🔧 HFR: 2.75 → 4.10 (avg 3.42, σ 0.67)
+   📐 FWHM: 6.46 → 9.63 (avg 8.05, σ 1.59)
+   ⭐ Stars: 244 → 250 (avg 247, consistency 0.99)
+   📈 Guide: 1.19″ 🟡Good
+
+📌 O Filter (2×600s, 20m)
+   🔧 HFR: 2.25 → 2.25 (avg 2.25, σ 0.00)
+   📐 FWHM: 5.29 → 5.29 (avg 5.29, σ 0.00)
+   ⭐ Stars: 247 → 248 (avg 248, consistency 1.00)
+   📈 Guide: 1.24″ 🟡Good
+
+🎯 Autofocus Summary
+🔄 Sessions: 3
+📈 Focus Stability: Good
+
+⚠️ Issues & Alerts
+❌ Aborted Captures: 4
+```
+
+The temporal plot shows:
+- **🔧 HFR Evolution**: Focus quality changes over time with autofocus events marked
+- **📈 Guiding Performance**: Mount tracking stability with quality zones
+- **🌡️ Temperature Evolution**: Environmental conditions during the session
 
 ## 🔍 Troubleshooting
 

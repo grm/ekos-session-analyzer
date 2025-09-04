@@ -1,17 +1,19 @@
 # ====================================
-# ASTRO SESSION ANALYSER - SIMPLIFIED CONFIG
-# Configuration example with 3 simple levels
+# ASTRO SESSION ANALYSER - EXAMPLE CONFIG
+# Complete configuration template with all supported parameters
 # ====================================
 
-# Discord webhook URL for sending summaries
-webhook: "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN"
+# Discord webhook URL for sending summaries (REQUIRED)
+webhook: "https://discord.com/api/webhooks/example/test"
 
-# Time window in hours to look back for sessions
-hours: 24
+# Time window in hours to analyze sessions
+hours: 48
 
-# Path to KStars/Ekos analyze files directory
-# Default: ~/.local/share/kstars/analyze
-analyze_dir: "/home/username/.local/share/kstars/analyze"
+# Path to Ekos analyze files 
+# Default paths:
+#   - Native KStars: ~/.local/share/kstars/analyze
+#   - Flatpak KStars: ~/.var/app/org.kde.kstars/data/kstars/analyze
+analyze_dir: "/home/grm/.var/app/org.kde.kstars/data/kstars/analyze"
 
 # Basic log level (DEBUG, INFO, WARNING, ERROR)
 log_level: "INFO"
@@ -21,28 +23,21 @@ log_level: "INFO"
 # ====================================
 
 # Discord report level: minimal, standard, detailed
-# - minimal: Ultra-quick notifications (3 lines max)
-# - standard: Current balanced format (default)
-# - detailed: Comprehensive analysis with correlations (requires numpy/scipy)
+# - minimal: Ultra-quick notifications with conditions & autofocus
+# - standard: Current balanced format (default) 
+# - detailed: Comprehensive analysis with correlations (auto-enables advanced analytics)
 discord_report_level: "standard"
 
 # ====================================
-# ADVANCED ANALYTICS (for detailed level only)
-# Requires: pip install numpy scipy
+# PLOTTING CONFIGURATION
 # ====================================
 
-# Enable advanced analytics and metrics
-advanced_analytics:
-  enabled: false  # Set to true for detailed level
-  
-  # Statistical correlation analysis
-  correlation_analysis: true
-  
-  # Session efficiency calculations
-  efficiency_analysis: true
-  
-  # Performance scoring (0-100 scale)
-  performance_scoring: true
+# Enable temporal plotting
+plotting:
+  enabled: true
+  output_dir: "./plots"
+  # Keep plots after dry-run for inspection (optional)
+  cleanup_after_dry_run: true
 
 # ====================================
 # ALERT THRESHOLDS
@@ -74,21 +69,28 @@ notifications:
   min_captures_for_report: 1
   
   # Include quality score in reports (requires advanced_analytics)
-  include_quality_score: false
+  include_quality_score: true
 
 # ====================================
-# CONFIGURATION EXAMPLES FOR DIFFERENT USERS
+# ADVANCED ANALYTICS (for detailed level)
+# Automatically enabled for 'detailed' level
+# Requires: pip install numpy scipy
 # ====================================
 
-# For beginners (copy these settings):
-# discord_report_level: "standard"
-# advanced_analytics: { enabled: false }
+# Analytics are automatically enabled for detailed level
+# No need to configure - everything is included in detailed mode
 
-# For enthusiasts/data lovers (copy these settings):
-# discord_report_level: "detailed"
-# advanced_analytics: { enabled: true }
+# ====================================
+# QUICK MODE EXAMPLES
+# ====================================
 
-# For monitoring/automation (copy these settings):
+# To switch quickly between modes:
+
+# MINIMAL MODE (quick notifications):
 # discord_report_level: "minimal"
-# advanced_analytics: { enabled: false }
-# notifications: { min_captures_for_report: 5 }
+
+# STANDARD MODE (balanced):
+# discord_report_level: "standard" 
+
+# DETAILED MODE (comprehensive analysis with correlations):
+# discord_report_level: "detailed"
