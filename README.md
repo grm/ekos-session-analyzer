@@ -281,7 +281,7 @@ alert_thresholds:
 
 **Method 1: Calculate from Equipment Specs**
 ```
-Pixel Scale = (206265 × pixel_size_μm) ÷ (focal_length_mm × binning)
+Pixel Scale = (206.265 × pixel_size_μm) ÷ (focal_length_mm × binning)
 ```
 
 **Method 2: From Plate Solving Software**
@@ -291,7 +291,7 @@ Pixel Scale = (206265 × pixel_size_μm) ÷ (focal_length_mm × binning)
 - **Ekos/KStars**: View solved image properties in the Image tab
 
 **Method 3: Online Calculators**
-- Use tools like AstroBin's Field of View calculator
+- Use tools like Astronomy.tools Field of View calculator (https://astronomy.tools/calculators/ccd_suitability)
 - Enter telescope focal length and camera pixel size
 
 #### 🔍 Finding Equipment Specifications
