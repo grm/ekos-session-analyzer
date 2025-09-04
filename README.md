@@ -150,6 +150,52 @@ Astrophotography session analyzer specialized for **Ekos/KStars**. This applicat
 - **For DETAILED level**: NumPy/SciPy for advanced analytics
 - **For plotting**: matplotlib (optional)
 
+## 🛠️ Prerequisites
+
+### Installing Pipenv
+
+This project uses **Pipenv** for dependency management. If you don't have pipenv installed, here's how to install it:
+
+#### Ubuntu/Debian
+```bash
+# Method 1: Using apt (recommended for system-wide installation)
+sudo apt update
+sudo apt install pipenv
+
+# Method 2: Using pip (if you prefer pip)
+sudo apt install python3-pip
+pip3 install --user pipenv
+
+# Method 3: Using the official installer
+curl https://raw.githubusercontent.com/pypa/pipenv/master/get-pipenv.py | python3
+```
+
+#### Other Linux Distributions
+```bash
+# Fedora/CentOS/RHEL
+sudo dnf install pipenv
+# or
+sudo yum install pipenv
+
+# Arch Linux
+sudo pacman -S python-pipenv
+
+# Using pip (universal)
+pip3 install --user pipenv
+```
+
+#### Verify Installation
+```bash
+pipenv --version
+# Should output something like: pipenv, version 2023.x.x
+```
+
+**Note for Ubuntu/Debian users**: If you installed pipenv with `pip3 install --user`, you may need to add `~/.local/bin` to your PATH:
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
 ## 🚀 Installation
 
 1. **Clone the repository**
