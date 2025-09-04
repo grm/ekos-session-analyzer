@@ -15,8 +15,9 @@ class EkosAnalyzer:
     def __init__(self, analyze_dir: str = None, pixel_scale_arcsec: float = None, guide_quality_thresholds: Dict = None):
         # Default path if not specified
         if analyze_dir is None:
-            analyze_dir = os.path.expanduser("~/.local/share/kstars/analyze")
-        self.analyze_dir = analyze_dir
+            analyze_dir = "~/.local/share/kstars/analyze"
+        # Always expand user home directory (handles ~ in paths)
+        self.analyze_dir = os.path.expanduser(analyze_dir)
         self.pixel_scale_arcsec = pixel_scale_arcsec
         
         # Default pixel-based quality thresholds (backwards compatible)
