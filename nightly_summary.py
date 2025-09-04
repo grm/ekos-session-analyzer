@@ -70,7 +70,7 @@ def main():
         ekos_results = ekos_analyzer.analyze_folder(hours=hours)
         
         if not ekos_results or ekos_results.get('total_captures', 0) == 0:
-            print("🌙 No Ekos session data found in the given time window.")
+            print(f"🌙 No Ekos session data found in the given {hours}-hour time window.")
             sys.exit(0)
         
         print(f"✅ Found Ekos data with {ekos_results.get('total_captures', 0)} captures")
