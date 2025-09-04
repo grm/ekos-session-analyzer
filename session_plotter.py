@@ -16,6 +16,15 @@ class SessionPlotter:
         self.config = config or {}
         self.plot_config = self.config.get('plotting', {})
         
+        # Get pixel scale configuration for accurate guide quality zones
+        imaging_setup = self.config.get('imaging_setup', {})
+        self.pixel_scale_arcsec = imaging_setup.get('pixel_scale_arcsec')
+        self.guide_quality_thresholds = self.config.get('alert_thresholds', {}).get('guide_quality', {
+            'excellent_px': 0.5,
+            'good_px': 1.0,
+            'average_px': 1.5
+        })
+        
         # Default plot settings
         self.figure_size = self.plot_config.get('figure_size', (12, 8))
         self.dpi = self.plot_config.get('dpi', 100)
@@ -297,10 +306,24 @@ class SessionPlotter:
             ax.plot(times, errors_smooth, color=self.colors['guiding'], 
                    linewidth=2, alpha=0.9, label='Smoothed trend', zorder=2)
         
-        # Add quality zones
-        ax.axhspan(0, 1.0, alpha=0.1, color='green', label='Excellent (<1″)')
-        ax.axhspan(1.0, 2.0, alpha=0.1, color='yellow', label='Good (1-2″)')
-        ax.axhspan(2.0, 3.0, alpha=0.1, color='orange', label='Average (2-3″)')
+        # Add quality zones (pixel-scale-based if available)
+        if self.pixel_scale_arcsec and self.pixel_scale_arcsec > 0:
+            # Convert pixel thresholds to arcsecond thresholds for plotting
+            excellent_arcsec = self.guide_quality_thresholds['excellent_px'] * self.pixel_scale_arcsec
+            good_arcsec = self.guide_quality_thresholds['good_px'] * self.pixel_scale_arcsec
+            average_arcsec = self.guide_quality_thresholds['average_px'] * self.pixel_scale_arcsec
+            
+            ax.axhspan(0, excellent_arcsec, alpha=0.1, color='green', 
+                      label=f'Excellent (<{self.guide_quality_thresholds["excellent_px"]:.1f}px)')
+            ax.axhspan(excellent_arcsec, good_arcsec, alpha=0.1, color='yellow', 
+                      label=f'Good (<{self.guide_quality_thresholds["good_px"]:.1f}px)')
+            ax.axhspan(good_arcsec, average_arcsec, alpha=0.1, color='orange', 
+                      label=f'Average (<{self.guide_quality_thresholds["average_px"]:.1f}px)')
+        else:
+            # Fallback to legacy arcsecond-based zones
+            ax.axhspan(0, 1.0, alpha=0.1, color='green', label='Excellent (<1″)')
+            ax.axhspan(1.0, 2.0, alpha=0.1, color='yellow', label='Good (1-2″)')
+            ax.axhspan(2.0, 3.0, alpha=0.1, color='orange', label='Average (2-3″)')
         
         ax.set_ylabel('Guiding Error (arcsec)', fontsize=11, color=self.colors['guiding'])
         ax.set_title('📈 Guiding Performance Evolution', fontsize=12, pad=10)
@@ -321,6 +344,36 @@ class SessionPlotter:
             ax.set_ylim(0, min(errors_p95 * 1.2, 5.0))  # Cap at 5 arcsec for readability
         
         ax.legend(loc='upper right', framealpha=0.9, fontsize=9)
+    
+    def _calculate_guide_quality_from_distance(self, avg_distance_arcsec: float) -> str:
+        """
+        Calculate guide quality rating using pixel-scale-based thresholds.
+        Same logic as in EkosAnalyzer for consistency.
+        """
+        # Use pixel-scale-based thresholds if available
+        if self.pixel_scale_arcsec and self.pixel_scale_arcsec > 0:
+            # Convert arcsecond error to pixel error
+            avg_distance_pixels = avg_distance_arcsec / self.pixel_scale_arcsec
+            
+            # Use pixel-based thresholds (much more accurate!)
+            if avg_distance_pixels < self.guide_quality_thresholds['excellent_px']:
+                return "Excellent"
+            elif avg_distance_pixels < self.guide_quality_thresholds['good_px']:
+                return "Good"
+            elif avg_distance_pixels < self.guide_quality_thresholds['average_px']:
+                return "Average"
+            else:
+                return "Poor"
+        else:
+            # Fallback to old arcsecond-based thresholds (less accurate)
+            if avg_distance_arcsec < 1.0:
+                return "Excellent"
+            elif avg_distance_arcsec < 2.0:
+                return "Good"
+            elif avg_distance_arcsec < 3.0:
+                return "Average"
+            else:
+                return "Poor"
     
     def _plot_temperature_data(self, ax, temp_data):
         """Plot temperature evolution."""
@@ -387,7 +440,8 @@ class SessionPlotter:
             errors_filtered = [e for e in errors if e <= 10.0]
             if errors_filtered:
                 guide_avg = np.mean(errors_filtered)
-                guide_quality = "Excellent" if guide_avg < 1.0 else "Good" if guide_avg < 2.0 else "Average"
+                # Use pixel-scale-based quality assessment
+                guide_quality = self._calculate_guide_quality_from_distance(guide_avg)
                 summary_parts.append(f'📈 Guide: {guide_avg:.2f}″ ({guide_quality})')
         
         if temporal_data['temperature_data']:

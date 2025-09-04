@@ -14,6 +14,7 @@ Astrophotography session analyzer specialized for **Ekos/KStars**. This applicat
 
 ### Advanced Features
 - **Multi-Filter Analysis**: Performance breakdown by filter with sub-session details
+- **Pixel-Scale-Based Guiding Quality**: Accurate guiding assessment based on YOUR specific equipment
 - **Guiding Analytics**: Comprehensive guiding performance analysis by filter
 - **Quality Metrics**: HFR, FWHM, star detection, and seeing conditions
 - **Temperature Correlation**: Statistical analysis of temperature effects on imaging quality
@@ -252,6 +253,85 @@ plotting:
 log_level: "INFO"
 ```
 
+### 🎯 Pixel Scale Configuration (HIGHLY RECOMMENDED)
+
+**NEW FEATURE**: Configure your equipment's pixel scale for dramatically more accurate guiding quality assessment!
+
+```yaml
+# Imaging setup configuration for accurate guiding assessment
+imaging_setup:
+  # Pixel scale in arcseconds per pixel
+  # Calculate as: (206265 × pixel_size_μm) ÷ (focal_length_mm × binning)
+  pixel_scale_arcsec: 1.0  # CHANGE THIS to match your setup
+  
+  # Optional: Equipment names for logging
+  telescope: "Your Telescope"
+  camera: "Your Camera"
+
+# Guide quality thresholds (in pixels - much more accurate!)
+alert_thresholds:
+  guide_quality:
+    excellent_px: 0.5    # < 0.5 pixels = Excellent
+    good_px: 1.0         # < 1.0 pixels = Good  
+    average_px: 1.5      # < 1.5 pixels = Average
+    # > 1.5 pixels = Poor
+```
+
+#### 📏 How to Find Your Pixel Scale
+
+**Method 1: Calculate from Equipment Specs**
+```
+Pixel Scale = (206265 × pixel_size_μm) ÷ (focal_length_mm × binning)
+```
+
+**Method 2: From Plate Solving Software**
+- **ASTAP**: Check image solving results
+- **PlateSolve2**: Look in FITS header for CDELT1/CDELT2
+- **ANSVR**: Check solving logs or image properties
+- **Ekos/KStars**: View solved image properties in the Image tab
+
+**Method 3: Online Calculators**
+- Use tools like AstroBin's Field of View calculator
+- Enter telescope focal length and camera pixel size
+
+#### 🔍 Finding Equipment Specifications
+
+**Camera Pixel Size** (common values):
+- **ASI183MC/MM**: 2.4μm
+- **ASI294MC/MM**: 4.63μm  
+- **ASI2600MC/MM**: 3.76μm
+- **Canon 6D**: 5.36μm
+- **Nikon D750**: 5.95μm
+- **QHY600**: 3.76μm
+
+**Telescope Focal Length**:
+- Check manufacturer specs or measure via plate solving
+- **Celestron C8**: 2032mm (f/10), 1280mm (f/6.3 with reducer)
+- **Celestron C11**: 2800mm (f/10), 1764mm (f/6.3 with reducer)  
+- **FSQ85**: 450mm
+- **FSQ106**: 530mm
+- **Takahashi TOA150**: 1095mm
+
+#### 📊 Common Setup Examples
+
+```yaml
+# High Resolution Setup
+# Celestron C8 f/6.3 (1280mm) + ASI183MC (2.4μm)
+pixel_scale_arcsec: 0.39
+
+# Medium Resolution Setup  
+# FSQ85 (450mm) + ASI294MC (4.63μm)
+pixel_scale_arcsec: 2.12
+
+# Wide Field Setup
+# 200mm lens f/2.8 + Canon 6D (5.36μm)
+pixel_scale_arcsec: 5.52
+
+# Ultra High Resolution
+# C11 f/10 (2800mm) + ASI183MC (2.4μm)
+pixel_scale_arcsec: 0.18
+```
+
 ### Advanced Options (Optional)
 
 ```yaml
@@ -448,10 +528,11 @@ This project is under MIT license. See LICENSE file for details.
 
 ## 🚀 Latest Updates
 
+- **🎯 Pixel-Scale-Based Guiding Quality**: Revolutionary improvement in guiding assessment accuracy! Configure your equipment's pixel scale for meaningful quality ratings instead of misleading fixed thresholds.
 - **Enhanced Multi-Filter Analysis**: Comprehensive sub-session breakdown by filter
 - **Improved Guiding Analytics**: Real-time guiding performance analysis with quality assessment
 - **Intelligent Message Splitting**: Automatic Discord message fragmentation for large sessions
-- **Temporal Plotting System**: HFR, guiding, and temperature evolution graphs
+- **Temporal Plotting System**: HFR, guiding, and temperature evolution graphs with pixel-scale-accurate quality zones
 - **Advanced Statistical Analysis**: Temperature correlations and quality metrics
 - **Better Error Handling**: Graceful degradation and clear error messages
 - **Unified Configuration**: Single config file supporting all features and levels

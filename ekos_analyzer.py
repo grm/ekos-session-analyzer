@@ -12,11 +12,26 @@ import glob
 import math
 
 class EkosAnalyzer:
-    def __init__(self, analyze_dir: str = None):
+    def __init__(self, analyze_dir: str = None, pixel_scale_arcsec: float = None, guide_quality_thresholds: Dict = None):
         # Default path if not specified
         if analyze_dir is None:
             analyze_dir = os.path.expanduser("~/.local/share/kstars/analyze")
         self.analyze_dir = analyze_dir
+        self.pixel_scale_arcsec = pixel_scale_arcsec
+        
+        # Default pixel-based quality thresholds (backwards compatible)
+        self.guide_quality_thresholds = guide_quality_thresholds or {
+            'excellent_px': 0.5,
+            'good_px': 1.0, 
+            'average_px': 1.5
+        }
+        
+        # Log setup information if pixel scale is provided
+        if self.pixel_scale_arcsec:
+            logging.info(f"Pixel scale configured: {self.pixel_scale_arcsec:.2f}\"/pixel")
+            logging.info(f"Guide quality thresholds: Excellent < {self.guide_quality_thresholds['excellent_px']:.1f}px, "
+                        f"Good < {self.guide_quality_thresholds['good_px']:.1f}px, "
+                        f"Average < {self.guide_quality_thresholds['average_px']:.1f}px")
         
     def find_analyze_files(self, hours: int = 24) -> List[str]:
         """Find .analyze files within the specified time window."""
@@ -510,15 +525,8 @@ class EkosAnalyzer:
                 avg_distance = sum(filtered_distances) / len(filtered_distances)
                 avg_rms = sum(rms_values) / len(rms_values) if rms_values else 0.0
                 
-                # Determine guide quality
-                if avg_distance < 1.0:
-                    quality = "Excellent"
-                elif avg_distance < 2.0:
-                    quality = "Good"
-                elif avg_distance < 3.0:
-                    quality = "Average"
-                else:
-                    quality = "Poor"
+                # Determine guide quality using pixel scale if available
+                quality = self._calculate_guide_quality_from_distance([avg_distance])
                 
                 metrics['guide_stats'] = {
                     'avg_distance': avg_distance,
@@ -922,21 +930,40 @@ class EkosAnalyzer:
         return filter_analysis
     
     def _calculate_guide_quality_from_distance(self, distances: List[float]) -> str:
-        """Calculate guide quality rating from real distance calculations."""
+        """
+        Calculate guide quality rating using pixel-scale-based thresholds.
+        Much more accurate than fixed arcsecond thresholds!
+        """
         if not distances:
             return "Unknown"
         
-        avg_distance = sum(distances) / len(distances)
+        avg_distance_arcsec = sum(distances) / len(distances)
         
-        # Quality thresholds in arcseconds (for real calculated distances)
-        if avg_distance < 1.0:
-            return "Excellent"
-        elif avg_distance < 2.0:
-            return "Good"
-        elif avg_distance < 3.0:
-            return "Average"
+        # Use pixel-scale-based thresholds if available
+        if self.pixel_scale_arcsec and self.pixel_scale_arcsec > 0:
+            # Convert arcsecond error to pixel error
+            avg_distance_pixels = avg_distance_arcsec / self.pixel_scale_arcsec
+            
+            # Use pixel-based thresholds (much more accurate!)
+            if avg_distance_pixels < self.guide_quality_thresholds['excellent_px']:
+                return "Excellent"
+            elif avg_distance_pixels < self.guide_quality_thresholds['good_px']:
+                return "Good"
+            elif avg_distance_pixels < self.guide_quality_thresholds['average_px']:
+                return "Average"
+            else:
+                return "Poor"
         else:
-            return "Poor"
+            # Fallback to old arcsecond-based thresholds (less accurate)
+            logging.debug("Using legacy arcsecond-based guide quality thresholds - consider configuring pixel scale for better accuracy")
+            if avg_distance_arcsec < 1.0:
+                return "Excellent"
+            elif avg_distance_arcsec < 2.0:
+                return "Good"
+            elif avg_distance_arcsec < 3.0:
+                return "Average"
+            else:
+                return "Poor"
     
     def _get_object_name_from_scheduler(self, scheduler_jobs: List[Dict]) -> str:
         """Extract object name from scheduler job data."""

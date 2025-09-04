@@ -49,8 +49,24 @@ def main():
     print("🔭 Analyzing Ekos/KStars sessions...")
     
     try:
-        # Initialize Ekos analyzer with configured directory
-        ekos_analyzer = EkosAnalyzer(analyze_dir=analyze_dir)
+        # Get imaging setup configuration for pixel-scale-based quality assessment
+        imaging_setup = config.get('imaging_setup', {})
+        pixel_scale = imaging_setup.get('pixel_scale_arcsec')
+        guide_quality_thresholds = config.get('alert_thresholds', {}).get('guide_quality')
+        
+        # Log equipment information if available
+        telescope_name = imaging_setup.get('telescope', 'Unknown Telescope')
+        camera_name = imaging_setup.get('camera', 'Unknown Camera')
+        if pixel_scale:
+            print(f"🔧 Equipment: {telescope_name} + {camera_name}")
+            print(f"📏 Pixel scale: {pixel_scale:.2f}\"/pixel")
+        
+        # Initialize Ekos analyzer with configured directory and pixel scale
+        ekos_analyzer = EkosAnalyzer(
+            analyze_dir=analyze_dir,
+            pixel_scale_arcsec=pixel_scale,
+            guide_quality_thresholds=guide_quality_thresholds
+        )
         ekos_results = ekos_analyzer.analyze_folder(hours=hours)
         
         if not ekos_results or ekos_results.get('total_captures', 0) == 0:
