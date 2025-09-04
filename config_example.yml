@@ -13,7 +13,7 @@ hours: 48
 # Default paths:
 #   - Native KStars: ~/.local/share/kstars/analyze
 #   - Flatpak KStars: ~/.var/app/org.kde.kstars/data/kstars/analyze
-analyze_dir: "/home/grm/.var/app/org.kde.kstars/data/kstars/analyze"
+analyze_dir: "~/.local/share/kstars/analyze"
 
 # Basic log level (DEBUG, INFO, WARNING, ERROR)
 log_level: "INFO"
