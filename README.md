@@ -25,6 +25,15 @@ Astrophotography session analyzer specialized for **Ekos/KStars**. This applicat
 
 ### 📱 **MINIMAL** - Quick Notifications
 ```
+**🔭 Analyzing Ekos/KStars sessions...
+🔧 Equipment: TEC 140ED + Zwo 6200 MM
+📏 Pixel scale: 0.79"/pixel
+✅ Found Ekos data with 33 captures
+📊 Using minimal report with basic analytics
+
+==================================================
+SUMMARY:
+==================================================
 **🔭 Session Summary (Minimal)**
 📸 **33 captures completed**
 ⏰ Duration: 7h 54m
@@ -36,12 +45,29 @@ Astrophotography session analyzer specialized for **Ekos/KStars**. This applicat
 🔄 Sessions: 20
 🌡️ Average Temperature: 9.0°C
 📈 Focus Stability: Frequent adjustments
+==================================================
+
+📈 Generating session plot...
+✅ Session plot generated: ./plots/session_analysis_20250905_091809.png
+✅ Summary and plot sent to Discord.
 ```
 
 ### 📊 **STANDARD** - Daily Usage (Default)
 ```
+**🔭 Analyzing Ekos/KStars sessions...
+🔧 Equipment: TEC 140ED + Zwo 6200 MM
+📏 Pixel scale: 0.79"/pixel
+✅ Found Ekos data with 33 captures
+📊 Using standard report with basic analytics
+📨 Generated 3 messages for Discord (detailed mode)
+
+==================================================
+SUMMARY:
+==================================================
+
+--- MESSAGE 1/3 (396 chars) ---
 **🔭 Ekos Session Summary**
-📅 2025-09-05 07:11 UTC
+📅 2025-09-05 07:18 UTC
 
 🌙 **Session Overview**
 📸 Total Captures: 33
@@ -58,6 +84,8 @@ Astrophotography session analyzer specialized for **Ekos/KStars**. This applicat
 🟡 Guide Quality: Good
 📈 RA: 0.38″ | DEC: 0.27″
 
+
+--- MESSAGE 2/3 (1494 chars) ---
 📊 **Capture Details**
 
 🎯 **NGC 7380**
@@ -75,6 +103,38 @@ Astrophotography session analyzer specialized for **Ekos/KStars**. This applicat
           📐 FWHM: 1.59 → 1.59 (avg 1.59)
          ⭐ Stars: 532 → 560 (avg 545, consistency 0.98)
 
+📌 S Filter (11×600s, 2h 3m)
+   📈 Guide: 0.50″ 🟡Good
+   📋 Sub-sessions: 2
+     #1: 22:53→23:40 (58m) | 5×600s
+          📈 Guide: 0.52″ 🟡Good
+          🔧 HFR: 1.37 → 1.39 (avg 1.38)
+          📐 FWHM: 1.64 → 1.66 (avg 1.65)
+         ⭐ Stars: 564 → 571 (avg 568, consistency 1.00)
+     #2: 03:07→04:02 (1h 5m) | 6×600s
+          📈 Guide: 0.49″ 🟡Good
+          🔧 HFR: 1.50 → 1.50 (avg 1.50)
+          📐 FWHM: 1.80 → 1.80 (avg 1.80)
+         ⭐ Stars: 543 → 569 (avg 556, consistency 0.98)
+
+📌 O Filter (10×600s, 1h 49m)
+   📈 Guide: 0.52″ 🟡Good
+   📋 Sub-sessions: 2
+     #1: 01:16→02:11 (1h 5m) | 6×600s
+          📈 Guide: 0.47″ 🟡Good
+          🔧 HFR: 1.86 → 1.86 (avg 1.86)
+          📐 FWHM: 2.24 → 2.24 (avg 2.24)
+         ⭐ Stars: 634 → 643 (avg 638, consistency 1.00)
+     #2: 05:36→06:10 (44m) | 4×600s
+          📈 Guide: 0.60″ 🟡Good
+          🔧 HFR: 1.92 → 1.92 (avg 1.92)
+          📐 FWHM: 2.30 → 2.30 (avg 2.30)
+         ⭐ Stars: 519 → 520 (avg 519, consistency 1.00)
+
+
+--- MESSAGE 3/3 (185 chars) ---
+**🔭 Session Summary (Final)**
+
 🎯 **Autofocus Summary**
 🔄 Sessions: 20
 🌡️ Average Temperature: 9.0°C
@@ -82,12 +142,33 @@ Astrophotography session analyzer specialized for **Ekos/KStars**. This applicat
 
 ⚠️ **Issues & Alerts**
 ❌ Aborted Captures: 7
+==================================================
+
+📈 Generating session plot...
+✅ Session plot generated: ./plots/session_analysis_20250905_091828.png
+📨 Sending 3 messages to Discord...
+✅ Message 1/3 sent with plot.
+✅ Message 2/3 sent.
+✅ Message 3/3 sent.
+🎉 All 3 messages sent successfully!
 ```
 
 ### 🔬 **DETAILED** - Data Analysis Mode
 ```
+🔭 Analyzing Ekos/KStars sessions...
+🔧 Equipment: TEC 140ED + Zwo 6200 MM
+📏 Pixel scale: 0.79"/pixel
+✅ Found Ekos data with 33 captures
+📊 Using detailed report with advanced analytics
+📨 Generated 3 messages for Discord (detailed mode)
+
+==================================================
+SUMMARY:
+==================================================
+
+--- MESSAGE 1/3 (661 chars) ---
 **🔭 Session Overview (1/3)**
-📅 2025-09-05 07:10 UTC
+📅 2025-09-05 07:18 UTC
 
 🌙 **Session Overview**
 📸 Total Captures: 33
@@ -104,10 +185,19 @@ Astrophotography session analyzer specialized for **Ekos/KStars**. This applicat
 🟡 Guide Quality: Good
 📈 RA: 0.38″ | DEC: 0.27″
 
+🎯 **Autofocus Summary**
+🔄 Sessions: 20
+🌡️ Average Temperature: 9.0°C
+📈 Focus Stability: Frequent adjustments
+
 📊 **Image Quality Analysis**
 🔧 HFR: 1.21 → 1.92 (avg 1.53)
 👁️ Seeing Conditions: Excellent
 
+⚠️ **Issues & Alerts**
+❌ Aborted Captures: 7
+
+--- MESSAGE 2/3 (722 chars) ---
 **📊 Performance Analysis (2/3)**
 
 🎯 **Filter Performance Summary**
@@ -116,10 +206,27 @@ Astrophotography session analyzer specialized for **Ekos/KStars**. This applicat
 📌 **O**: 10×600s (1.8h) - 🔧 1.89 | 📈 0.52″ 🟡
 📌 **S**: 11×600s (2.1h) - 🔧 1.44 | 📈 0.50″ 🟡
 
+📊 **Capture Details**
+📌 NGC 7380 - S (11x600s, 1h 49m)
+   🔧 HFR: 1.37 → 1.50 (avg 1.44, σ 0.06)
+   📐 FWHM: 3.22 → 3.53 (avg 3.39, σ 0.15)
+   ⭐ Stars: 543 → 571 (avg 561, consistency 0.98)
+
+📌 NGC 7380 - H (12x600s, 2h)
+   🔧 HFR: 1.21 → 1.39 (avg 1.32, σ 0.06)
+   📐 FWHM: 2.85 → 3.26 (avg 3.10, σ 0.14)
+   ⭐ Stars: 532 → 581 (avg 563, consistency 0.97)
+
+📌 NGC 7380 - O (10x600s, 1h 40m)
+   🔧 HFR: 1.86 → 1.92 (avg 1.89, σ 0.03)
+   📐 FWHM: 4.38 → 4.51 (avg 4.43, σ 0.06)
+   ⭐ Stars: 519 → 643 (avg 591, consistency 0.90)
+
+
+--- MESSAGE 3/3 (1530 chars) ---
 **🔬 Detailed Sub-Sessions (3/3)**
 
-📌 H Filter (12×600s, 2h 18m)
-📋 Sub-sessions: 2
+   📋 Sub-sessions: 2
      #1: 23:55→00:58 (1h 12m) | 6×600s
           📈 Guide: 0.50″ 🟡Good
           🔧 HFR: 1.21 → 1.39 (avg 1.31)
@@ -132,7 +239,8 @@ Astrophotography session analyzer specialized for **Ekos/KStars**. This applicat
          ⭐ Stars: 532 → 560 (avg 545, consistency 0.98)
 
 📌 S Filter (11×600s, 2h 3m)
-📋 Sub-sessions: 2
+   📈 Guide: 0.50″ 🟡Good
+   📋 Sub-sessions: 2
      #1: 22:53→23:40 (58m) | 5×600s
           📈 Guide: 0.52″ 🟡Good
           🔧 HFR: 1.37 → 1.39 (avg 1.38)
@@ -145,7 +253,8 @@ Astrophotography session analyzer specialized for **Ekos/KStars**. This applicat
          ⭐ Stars: 543 → 569 (avg 556, consistency 0.98)
 
 📌 O Filter (10×600s, 1h 49m)
-📋 Sub-sessions: 2
+   📈 Guide: 0.52″ 🟡Good
+   📋 Sub-sessions: 2
      #1: 01:16→02:11 (1h 5m) | 6×600s
           📈 Guide: 0.47″ 🟡Good
           🔧 HFR: 1.86 → 1.86 (avg 1.86)
@@ -157,8 +266,18 @@ Astrophotography session analyzer specialized for **Ekos/KStars**. This applicat
           📐 FWHM: 2.30 → 2.30 (avg 2.30)
          ⭐ Stars: 519 → 520 (avg 519, consistency 1.00)
 
+
 🤖 **Analysis & Recommendations**
 🎉 Excellent conditions - great time for detailed imaging!
+==================================================
+
+📈 Generating session plot...
+✅ Session plot generated: ./plots/session_analysis_20250905_091844.png
+📨 Sending 3 messages to Discord...
+✅ Message 1/3 sent with plot.
+✅ Message 2/3 sent.
+✅ Message 3/3 sent.
+🎉 All 3 messages sent successfully!
 ```
 
 ## 📋 Requirements
