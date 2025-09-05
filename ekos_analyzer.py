@@ -747,10 +747,35 @@ class EkosAnalyzer:
         """
         filter_analysis = {}
         
-        # Group all captures by filter (ignoring object name for now)
+        # Create session_start mapping for absolute time calculation
+        session_start_map = {}
+        for session in all_sessions:
+            if session['session_start']:
+                try:
+                    datetime_str = session['session_start']
+                    if '.' in datetime_str:
+                        datetime_str = datetime_str.split('.')[0]
+                    session_start_time = datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S')
+                    session_start_map[session['filepath']] = session_start_time
+                except ValueError:
+                    logging.debug(f"Could not parse session start: {session['session_start']}")
+        
+        # Group all captures by filter (ignoring object name for now) and track source session
         filter_captures = defaultdict(list)
         for (obj_name, filter_name), captures in capture_summary.items():
-            filter_captures[filter_name].extend(captures)
+            for capture in captures:
+                # Find which session this capture belongs to (by timestamp matching)
+                capture['source_session'] = None
+                for session in all_sessions:
+                    session_captures = [c for c in session['captures'] if c['event'] == 'complete']
+                    for session_capture in session_captures:
+                        if abs(session_capture['timestamp'] - capture['timestamp']) < 1:  # Same timestamp
+                            capture['source_session'] = session['filepath']
+                            break
+                    if capture['source_session']:
+                        break
+                
+                filter_captures[filter_name].append(capture)
         
         # Create mapping of timestamps to guide data from all sessions
         timestamp_to_guide = {}
@@ -794,6 +819,29 @@ class EkosAnalyzer:
                 start_ts = min(cap['timestamp'] for cap in sub_session_captures)
                 end_ts = max(cap['timestamp'] for cap in sub_session_captures)
                 
+                # Find the session start time for this sub-session
+                # Use the first capture's source session to get the session start
+                session_start_time = None
+                for capture in sub_session_captures:
+                    if capture.get('source_session') and capture['source_session'] in session_start_map:
+                        session_start_time = session_start_map[capture['source_session']]
+                        break
+                
+                # If no session start found, use first available session start as fallback
+                if not session_start_time and session_start_map:
+                    session_start_time = list(session_start_map.values())[0]
+                
+                # Calculate absolute times from relative timestamps
+                if session_start_time:
+                    absolute_start = session_start_time + timedelta(seconds=start_ts)
+                    absolute_end = session_start_time + timedelta(seconds=end_ts)
+                    start_time_formatted = absolute_start.strftime('%H:%M')
+                    end_time_formatted = absolute_end.strftime('%H:%M')
+                else:
+                    # Fallback to relative times if session start not available
+                    start_time_formatted = f"T+{int(start_ts//3600):02d}:{int((start_ts%3600)//60):02d}"
+                    end_time_formatted = f"T+{int(end_ts//3600):02d}:{int((end_ts%3600)//60):02d}"
+                
                 # Expand time window to include guide data during capture acquisition
                 # Look for corresponding CaptureStarting events to get the real start time
                 expanded_start_ts = start_ts
@@ -836,8 +884,8 @@ class EkosAnalyzer:
                     'end_timestamp': end_ts,
                     'duration_minutes': duration_minutes,
                     'exposure_time': exposure_time,
-                    'start_time_formatted': datetime.fromtimestamp(start_ts).strftime('%H:%M'),
-                    'end_time_formatted': datetime.fromtimestamp(end_ts).strftime('%H:%M'),
+                    'start_time_formatted': start_time_formatted,
+                    'end_time_formatted': end_time_formatted,
                     'hfr_stats': metrics['hfr_stats'],
                     'fwhm_stats': metrics['fwhm_stats'],
                     'guide_stats': metrics['guide_stats'],
