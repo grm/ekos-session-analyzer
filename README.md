@@ -26,121 +26,139 @@ Astrophotography session analyzer specialized for **Ekos/KStars**. This applicat
 ### 📱 **MINIMAL** - Quick Notifications
 ```
 **🔭 Session Summary (Minimal)**
-📸 **31 captures completed**
-⏰ Duration: 5h 55m
+📸 **33 captures completed**
+⏰ Duration: 7h 54m
 
 🌤️ **Session Conditions**
-🌡️ Temperature Stability: Variable (Δ5.1°C)
-🔭 Mount Tracking: Good (28 events)
+🌡️ Temperature Stability: Moderate (Δ4.1°C)
 
 🎯 **Autofocus Summary**
-🔄 Sessions: 9
+🔄 Sessions: 20
+🌡️ Average Temperature: 9.0°C
 📈 Focus Stability: Frequent adjustments
-
-🚨 **4 Critical Issues**
-• 4 aborted captures detected
 ```
 
 ### 📊 **STANDARD** - Daily Usage (Default)
 ```
 **🔭 Ekos Session Summary**
-📅 2024-01-15 18:12 UTC
+📅 2025-09-05 07:11 UTC
 
 🌙 **Session Overview**
-📸 Total Captures: 31
-⏰ Duration: 11:41 → 17:37 (5h 55m)
-🌡️ Temperature: 15.8°C → 20.9°C (avg 17.0°C)
+📸 Total Captures: 33
+⏰ Duration: 22:16 → 06:11 (7h 54m)
+🌡️ Temperature: 7.6°C → 11.7°C (avg 8.6°C)
 🎯 Objects: 1 | 🔍 Filters: 3 (H, O, S)
 
 🌤️ **Session Conditions**
-🌡️ Temperature Stability: Variable (Δ5.1°C)
-🔭 Mount Tracking: Good (28 events)
+🌡️ Temperature Stability: Moderate (Δ4.1°C)
 
 🌟 **Guiding Performance**
-📊 Measurements: 1,247
-🎯 Avg Error: 0.92″
+📊 Measurements: 6130
+🎯 Avg Error: 0.51″
 🟡 Guide Quality: Good
-📈 RA: 0.78″ | DEC: 0.61″
+📈 RA: 0.38″ | DEC: 0.27″
 
 📊 **Capture Details**
 
 🎯 **NGC 7380**
-📌 H Filter (11×600s, 1h 50m)
-   🔧 HFR: 3.60 → 5.62 (avg 4.64, σ 0.66)
-   📐 FWHM: 8.46 → 13.21 (avg 10.90, σ 1.55)
-   ⭐ Stars: 249 → 250 (avg 250, consistency 1.00)
-   📈 Guide: 0.89″ 🟡Good
+📌 H Filter (12×600s, 2h 18m)
+   📈 Guide: 0.49″ 🟡Good
+   📋 Sub-sessions: 2
+     #1: 23:55→00:58 (1h 12m) | 6×600s
+          📈 Guide: 0.50″ 🟡Good
+          🔧 HFR: 1.21 → 1.39 (avg 1.31)
+          📐 FWHM: 1.46 → 1.67 (avg 1.57)
+         ⭐ Stars: 579 → 581 (avg 580, consistency 1.00)
+     #2: 04:20→05:15 (1h 5m) | 6×600s
+          📈 Guide: 0.48″ 🟡Good
+          🔧 HFR: 1.32 → 1.32 (avg 1.32)
+          📐 FWHM: 1.59 → 1.59 (avg 1.59)
+         ⭐ Stars: 532 → 560 (avg 545, consistency 0.98)
 
 🎯 **Autofocus Summary**
-🔄 Sessions: 9
-🌡️ Average Temperature: 17.1°C
+🔄 Sessions: 20
+🌡️ Average Temperature: 9.0°C
 📈 Focus Stability: Frequent adjustments
 
 ⚠️ **Issues & Alerts**
-❌ Aborted Captures: 4
+❌ Aborted Captures: 7
 ```
 
 ### 🔬 **DETAILED** - Data Analysis Mode
 ```
 **🔭 Session Overview (1/3)**
-📅 2024-01-15 18:12 UTC
+📅 2025-09-05 07:10 UTC
 
 🌙 **Session Overview**
-📸 Total Captures: 31
-⏰ Duration: 11:41 → 17:37 (5h 55m)
-🌡️ Temperature: 15.8°C → 20.9°C (avg 17.0°C) (Stability: 60%)
+📸 Total Captures: 33
+⏰ Duration: 22:16 → 06:11 (7h 54m)
+🌡️ Temperature: 7.6°C → 11.7°C (avg 8.6°C) (Stability: 0%)
 🎯 Objects: 1 | 🔍 Filters: 3 (H, O, S)
 
 🌤️ **Session Conditions**
-🌡️ Temperature Stability: Variable (Δ5.1°C)
-🔭 Mount Tracking: Good (28 events)
+🌡️ Temperature Stability: Moderate (Δ4.1°C)
 
 🌟 **Guiding Performance**
-📊 Measurements: 1,247
-🎯 Avg Error: 0.92″
+📊 Measurements: 6130
+🎯 Avg Error: 0.51″
 🟡 Guide Quality: Good
-📈 RA: 0.78″ | DEC: 0.61″
+📈 RA: 0.38″ | DEC: 0.27″
 
 📊 **Image Quality Analysis**
-🔧 HFR: 1.96 → 5.62 (avg 3.06)
-👁️ Seeing Conditions: Average
-📈 HFR Stability: 0.215 (lower is better)
+🔧 HFR: 1.21 → 1.92 (avg 1.53)
+👁️ Seeing Conditions: Excellent
 
 **📊 Performance Analysis (2/3)**
 
 🎯 **Filter Performance Summary**
 
-📌 **H**: 11×600s (1.8h) - 🔧 4.64 | 📈 0.89″ 🟡
-📌 **O**: 13×600s (2.2h) - 🔧 2.83 | 📈 0.95″ 🟡  
-📌 **S**: 7×600s (1.2h) - 🔧 2.41 | 📈 0.91″ 🟡
+📌 **H**: 12×600s (2.3h) - 🔧 1.32 | 📈 0.49″ 🟡
+📌 **O**: 10×600s (1.8h) - 🔧 1.89 | 📈 0.52″ 🟡
+📌 **S**: 11×600s (2.1h) - 🔧 1.44 | 📈 0.50″ 🟡
 
 **🔬 Detailed Sub-Sessions (3/3)**
 
-🎯 **NGC 7380**
-📌 H Filter (11×600s, 1h 50m)
+📌 H Filter (12×600s, 2h 18m)
 📋 Sub-sessions: 2
-     #1: 22:46→23:57 (1h 10m) | 7×600s
-          📈 Guide: 0.94″ 🟡Good
-          🔧 HFR: 4.12 → 5.62 (avg 4.89)
-          📐 FWHM: 4.94 → 6.74 (avg 5.87)
-         ⭐ Stars: 249 → 250 (avg 250, consistency 1.00)
-     #2: 00:15→00:55 (40m) | 4×600s
-          📈 Guide: 0.81″ 🟡Good
-          🔧 HFR: 3.60 → 4.98 (avg 4.22)
-          📐 FWHM: 4.32 → 5.98 (avg 5.06)
-         ⭐ Stars: 249 → 250 (avg 250, consistency 1.00)
+     #1: 23:55→00:58 (1h 12m) | 6×600s
+          📈 Guide: 0.50″ 🟡Good
+          🔧 HFR: 1.21 → 1.39 (avg 1.31)
+          📐 FWHM: 1.46 → 1.67 (avg 1.57)
+         ⭐ Stars: 579 → 581 (avg 580, consistency 1.00)
+     #2: 04:20→05:15 (1h 5m) | 6×600s
+          📈 Guide: 0.48″ 🟡Good
+          🔧 HFR: 1.32 → 1.32 (avg 1.32)
+          📐 FWHM: 1.59 → 1.59 (avg 1.59)
+         ⭐ Stars: 532 → 560 (avg 545, consistency 0.98)
 
-🌡️ **Temperature Analysis**
-📊 Thermal Stability: 60% (Range: 5.1°C)
-📈 Temp-HFR Correlation: -0.234 (significant)
+📌 S Filter (11×600s, 2h 3m)
+📋 Sub-sessions: 2
+     #1: 22:53→23:40 (58m) | 5×600s
+          📈 Guide: 0.52″ 🟡Good
+          🔧 HFR: 1.37 → 1.39 (avg 1.38)
+          📐 FWHM: 1.64 → 1.66 (avg 1.65)
+         ⭐ Stars: 564 → 571 (avg 568, consistency 1.00)
+     #2: 03:07→04:02 (1h 5m) | 6×600s
+          📈 Guide: 0.49″ 🟡Good
+          🔧 HFR: 1.50 → 1.50 (avg 1.50)
+          📐 FWHM: 1.80 → 1.80 (avg 1.80)
+         ⭐ Stars: 543 → 569 (avg 556, consistency 0.98)
 
-🎯 **Autofocus Analysis**
-🔄 Sessions: 9
-🔍 **By Filter:**
-   • H: 3 sessions (avg temp 16.8°C)
-   • O: 4 sessions (avg temp 17.2°C)
-   • S: 2 sessions (avg temp 17.5°C)
-⏱️ Avg Interval: 45 minutes
+📌 O Filter (10×600s, 1h 49m)
+📋 Sub-sessions: 2
+     #1: 01:16→02:11 (1h 5m) | 6×600s
+          📈 Guide: 0.47″ 🟡Good
+          🔧 HFR: 1.86 → 1.86 (avg 1.86)
+          📐 FWHM: 2.24 → 2.24 (avg 2.24)
+         ⭐ Stars: 634 → 643 (avg 638, consistency 1.00)
+     #2: 05:36→06:10 (44m) | 4×600s
+          📈 Guide: 0.60″ 🟡Good
+          🔧 HFR: 1.92 → 1.92 (avg 1.92)
+          📐 FWHM: 2.30 → 2.30 (avg 2.30)
+         ⭐ Stars: 519 → 520 (avg 519, consistency 1.00)
+
+🤖 **Analysis & Recommendations**
+🎉 Excellent conditions - great time for detailed imaging!
 ```
 
 ## 📋 Requirements
@@ -383,7 +401,7 @@ Add to your crontab for daily summary at 8 AM:
 
 Here's an example of what gets sent to Discord, including both the comprehensive text summary and temporal visualization:
 
-![Example Session Plot](example_plot.png)
+![Latest Session Plot](latest_session_plot.png)
 
 **Example Discord Message:**
 ```
