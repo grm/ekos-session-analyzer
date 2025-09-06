@@ -201,6 +201,15 @@ class EkosAnalyzer:
                         
                 elif event_type == 'CaptureComplete':
                     if len(parts) >= 6:
+                        # Parse HFR directly from capture (field 5)
+                        hfr_value = None
+                        try:
+                            hfr_candidate = float(parts[4])  # HFR is at index 4
+                            if hfr_candidate > 0:  # Valid HFR
+                                hfr_value = hfr_candidate
+                        except (ValueError, IndexError):
+                            pass
+                        
                         # Parse stars count - at index 7 based on actual Ekos format
                         stars_value = None
                         if len(parts) > 7:
@@ -216,8 +225,8 @@ class EkosAnalyzer:
                             'event': 'complete',
                             'exposure': float(parts[2]),
                             'filter': parts[3],
-                            'hfr': None,  # Will be filled from autofocus data later
-                            'fwhm': None,  # Will be calculated from HFR
+                            'hfr': hfr_value,  # Use actual HFR from capture
+                            'fwhm': self._calculate_fwhm_from_hfr(hfr_value) if hfr_value else None,
                             'stars': stars_value,
                             'filepath': parts[5] if len(parts) > 5 else None
                         }
@@ -473,7 +482,7 @@ class EkosAnalyzer:
         completed_captures = [c for c in session_data['captures'] if c['event'] == 'complete']
         completed_captures.sort(key=lambda x: x['timestamp'])
         
-        # For each autofocus session, associate HFR with subsequent captures
+        # For each autofocus session, only fill in missing HFR data (don't overwrite existing)
         for af in completed_autofocus:
             if not af.get('best_hfr'):
                 continue
@@ -495,20 +504,22 @@ class EkosAnalyzer:
             if next_af_timestamp is None:
                 next_af_timestamp = af_timestamp + 7200  # 2 hours in seconds
             
-            # Apply HFR to captures in this time window
+            # Only fill missing HFR data, don't overwrite existing values
             captures_updated = 0
             for capture in completed_captures:
                 if (capture['filter'] == filter_name and 
                     capture['timestamp'] > af_timestamp and
                     capture['timestamp'] < next_af_timestamp):
                     
-                    # Update HFR and FWHM for all captures in the window
-                    capture['hfr'] = best_hfr
-                    capture['fwhm'] = self._calculate_fwhm_from_hfr(best_hfr)
-                    captures_updated += 1
-                    logging.debug(f"Associated HFR {best_hfr:.2f} and FWHM {capture['fwhm']:.2f} with {filter_name} capture at {capture['timestamp']}")
+                    # Only update if HFR is missing (preserve real capture HFR values)
+                    if capture.get('hfr') is None:
+                        capture['hfr'] = best_hfr
+                        capture['fwhm'] = self._calculate_fwhm_from_hfr(best_hfr)
+                        captures_updated += 1
+                        logging.debug(f"Filled missing HFR {best_hfr:.2f} and FWHM {capture['fwhm']:.2f} for {filter_name} capture at {capture['timestamp']}")
             
-            logging.debug(f"Updated {captures_updated} captures with HFR from autofocus session at {af_timestamp}")
+            if captures_updated > 0:
+                logging.debug(f"Filled {captures_updated} missing HFR values from autofocus session at {af_timestamp}")
         
         return session_data
     

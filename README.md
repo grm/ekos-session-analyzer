@@ -25,15 +25,6 @@ Astrophotography session analyzer specialized for **Ekos/KStars**. This applicat
 
 ### 📱 **MINIMAL** - Quick Notifications
 ```
-**🔭 Analyzing Ekos/KStars sessions...
-🔧 Equipment: TEC 140ED + Zwo 6200 MM
-📏 Pixel scale: 0.79"/pixel
-✅ Found Ekos data with 33 captures
-📊 Using minimal report with basic analytics
-
-==================================================
-SUMMARY:
-==================================================
 **🔭 Session Summary (Minimal)**
 📸 **33 captures completed**
 ⏰ Duration: 7h 54m
@@ -45,29 +36,12 @@ SUMMARY:
 🔄 Sessions: 20
 🌡️ Average Temperature: 9.0°C
 📈 Focus Stability: Frequent adjustments
-==================================================
-
-📈 Generating session plot...
-✅ Session plot generated: ./plots/session_analysis_20250905_091809.png
-✅ Summary and plot sent to Discord.
 ```
 
 ### 📊 **STANDARD** - Daily Usage (Default)
 ```
-**🔭 Analyzing Ekos/KStars sessions...
-🔧 Equipment: TEC 140ED + Zwo 6200 MM
-📏 Pixel scale: 0.79"/pixel
-✅ Found Ekos data with 33 captures
-📊 Using standard report with basic analytics
-📨 Generated 3 messages for Discord (detailed mode)
-
-==================================================
-SUMMARY:
-==================================================
-
---- MESSAGE 1/3 (396 chars) ---
 **🔭 Ekos Session Summary**
-📅 2025-09-05 07:18 UTC
+📅 2025-09-05 07:11 UTC
 
 🌙 **Session Overview**
 📸 Total Captures: 33
@@ -84,8 +58,6 @@ SUMMARY:
 🟡 Guide Quality: Good
 📈 RA: 0.38″ | DEC: 0.27″
 
-
---- MESSAGE 2/3 (1494 chars) ---
 📊 **Capture Details**
 
 🎯 **NGC 7380**
@@ -94,46 +66,14 @@ SUMMARY:
    📋 Sub-sessions: 2
      #1: 23:55→00:58 (1h 12m) | 6×600s
           📈 Guide: 0.50″ 🟡Good
-          🔧 HFR: 1.21 → 1.39 (avg 1.31)
-          📐 FWHM: 1.46 → 1.67 (avg 1.57)
-         ⭐ Stars: 579 → 581 (avg 580, consistency 1.00)
+          🔧 HFR: 2.65 → 3.46 (avg 2.97)
+          📐 FWHM: 3.18 → 4.15 (avg 3.56)
+          ⭐ Stars: 579 → 581 (avg 580, consistency 1.00)
      #2: 04:20→05:15 (1h 5m) | 6×600s
           📈 Guide: 0.48″ 🟡Good
-          🔧 HFR: 1.32 → 1.32 (avg 1.32)
-          📐 FWHM: 1.59 → 1.59 (avg 1.59)
-         ⭐ Stars: 532 → 560 (avg 545, consistency 0.98)
-
-📌 S Filter (11×600s, 2h 3m)
-   📈 Guide: 0.50″ 🟡Good
-   📋 Sub-sessions: 2
-     #1: 22:53→23:40 (58m) | 5×600s
-          📈 Guide: 0.52″ 🟡Good
-          🔧 HFR: 1.37 → 1.39 (avg 1.38)
-          📐 FWHM: 1.64 → 1.66 (avg 1.65)
-         ⭐ Stars: 564 → 571 (avg 568, consistency 1.00)
-     #2: 03:07→04:02 (1h 5m) | 6×600s
-          📈 Guide: 0.49″ 🟡Good
-          🔧 HFR: 1.50 → 1.50 (avg 1.50)
-          📐 FWHM: 1.80 → 1.80 (avg 1.80)
-         ⭐ Stars: 543 → 569 (avg 556, consistency 0.98)
-
-📌 O Filter (10×600s, 1h 49m)
-   📈 Guide: 0.52″ 🟡Good
-   📋 Sub-sessions: 2
-     #1: 01:16→02:11 (1h 5m) | 6×600s
-          📈 Guide: 0.47″ 🟡Good
-          🔧 HFR: 1.86 → 1.86 (avg 1.86)
-          📐 FWHM: 2.24 → 2.24 (avg 2.24)
-         ⭐ Stars: 634 → 643 (avg 638, consistency 1.00)
-     #2: 05:36→06:10 (44m) | 4×600s
-          📈 Guide: 0.60″ 🟡Good
-          🔧 HFR: 1.92 → 1.92 (avg 1.92)
-          📐 FWHM: 2.30 → 2.30 (avg 2.30)
-         ⭐ Stars: 519 → 520 (avg 519, consistency 1.00)
-
-
---- MESSAGE 3/3 (185 chars) ---
-**🔭 Session Summary (Final)**
+          🔧 HFR: 3.27 → 5.31 (avg 4.27)
+          📐 FWHM: 3.92 → 6.38 (avg 5.12)
+          ⭐ Stars: 532 → 560 (avg 545, consistency 0.98)
 
 🎯 **Autofocus Summary**
 🔄 Sessions: 20
@@ -142,33 +82,12 @@ SUMMARY:
 
 ⚠️ **Issues & Alerts**
 ❌ Aborted Captures: 7
-==================================================
-
-📈 Generating session plot...
-✅ Session plot generated: ./plots/session_analysis_20250905_091828.png
-📨 Sending 3 messages to Discord...
-✅ Message 1/3 sent with plot.
-✅ Message 2/3 sent.
-✅ Message 3/3 sent.
-🎉 All 3 messages sent successfully!
 ```
 
 ### 🔬 **DETAILED** - Data Analysis Mode
 ```
-🔭 Analyzing Ekos/KStars sessions...
-🔧 Equipment: TEC 140ED + Zwo 6200 MM
-📏 Pixel scale: 0.79"/pixel
-✅ Found Ekos data with 33 captures
-📊 Using detailed report with advanced analytics
-📨 Generated 3 messages for Discord (detailed mode)
-
-==================================================
-SUMMARY:
-==================================================
-
---- MESSAGE 1/3 (661 chars) ---
 **🔭 Session Overview (1/3)**
-📅 2025-09-05 07:18 UTC
+📅 2025-09-05 07:32 UTC
 
 🌙 **Session Overview**
 📸 Total Captures: 33
@@ -191,93 +110,64 @@ SUMMARY:
 📈 Focus Stability: Frequent adjustments
 
 📊 **Image Quality Analysis**
-🔧 HFR: 1.21 → 1.92 (avg 1.53)
-👁️ Seeing Conditions: Excellent
+🔧 HFR: 1.87 → 5.31 (avg 2.71)
+👁️ Seeing Conditions: Good
 
 ⚠️ **Issues & Alerts**
 ❌ Aborted Captures: 7
+🚨 High HFR detected: 5.31 pixels (consider refocusing)
 
---- MESSAGE 2/3 (722 chars) ---
 **📊 Performance Analysis (2/3)**
 
 🎯 **Filter Performance Summary**
 
-📌 **H**: 12×600s (2.3h) - 🔧 1.32 | 📈 0.49″ 🟡
-📌 **O**: 10×600s (1.8h) - 🔧 1.89 | 📈 0.52″ 🟡
-📌 **S**: 11×600s (2.1h) - 🔧 1.44 | 📈 0.50″ 🟡
+📌 **H**: 12×600s (2.3h) - 🔧 3.62 | 📈 0.49″ 🟡
+📌 **O**: 10×600s (1.8h) - 🔧 2.31 | 📈 0.52″ 🟡
+📌 **S**: 11×600s (2.1h) - 🔧 2.08 | 📈 0.50″ 🟡
 
-📊 **Capture Details**
-📌 NGC 7380 - S (11x600s, 1h 49m)
-   🔧 HFR: 1.37 → 1.50 (avg 1.44, σ 0.06)
-   📐 FWHM: 3.22 → 3.53 (avg 3.39, σ 0.15)
-   ⭐ Stars: 543 → 571 (avg 561, consistency 0.98)
-
-📌 NGC 7380 - H (12x600s, 2h)
-   🔧 HFR: 1.21 → 1.39 (avg 1.32, σ 0.06)
-   📐 FWHM: 2.85 → 3.26 (avg 3.10, σ 0.14)
-   ⭐ Stars: 532 → 581 (avg 563, consistency 0.97)
-
-📌 NGC 7380 - O (10x600s, 1h 40m)
-   🔧 HFR: 1.86 → 1.92 (avg 1.89, σ 0.03)
-   📐 FWHM: 4.38 → 4.51 (avg 4.43, σ 0.06)
-   ⭐ Stars: 519 → 643 (avg 591, consistency 0.90)
-
-
---- MESSAGE 3/3 (1530 chars) ---
 **🔬 Detailed Sub-Sessions (3/3)**
 
-   📋 Sub-sessions: 2
+📌 H Filter (12×600s, 2h 18m)
+📋 Sub-sessions: 2
      #1: 23:55→00:58 (1h 12m) | 6×600s
           📈 Guide: 0.50″ 🟡Good
-          🔧 HFR: 1.21 → 1.39 (avg 1.31)
-          📐 FWHM: 1.46 → 1.67 (avg 1.57)
-         ⭐ Stars: 579 → 581 (avg 580, consistency 1.00)
+          🔧 HFR: 2.65 → 3.46 (avg 2.97)
+          📐 FWHM: 3.18 → 4.15 (avg 3.56)
+          ⭐ Stars: 579 → 581 (avg 580, consistency 1.00)
      #2: 04:20→05:15 (1h 5m) | 6×600s
           📈 Guide: 0.48″ 🟡Good
-          🔧 HFR: 1.32 → 1.32 (avg 1.32)
-          📐 FWHM: 1.59 → 1.59 (avg 1.59)
-         ⭐ Stars: 532 → 560 (avg 545, consistency 0.98)
+          🔧 HFR: 3.27 → 5.31 (avg 4.27)
+          📐 FWHM: 3.92 → 6.38 (avg 5.12)
+          ⭐ Stars: 532 → 560 (avg 545, consistency 0.98)
 
 📌 S Filter (11×600s, 2h 3m)
-   📈 Guide: 0.50″ 🟡Good
-   📋 Sub-sessions: 2
+📋 Sub-sessions: 2
      #1: 22:53→23:40 (58m) | 5×600s
           📈 Guide: 0.52″ 🟡Good
-          🔧 HFR: 1.37 → 1.39 (avg 1.38)
-          📐 FWHM: 1.64 → 1.66 (avg 1.65)
-         ⭐ Stars: 564 → 571 (avg 568, consistency 1.00)
+          🔧 HFR: 1.90 → 2.41 (avg 2.04)
+          📐 FWHM: 2.28 → 2.89 (avg 2.44)
+          ⭐ Stars: 564 → 571 (avg 568, consistency 1.00)
      #2: 03:07→04:02 (1h 5m) | 6×600s
           📈 Guide: 0.49″ 🟡Good
-          🔧 HFR: 1.50 → 1.50 (avg 1.50)
-          📐 FWHM: 1.80 → 1.80 (avg 1.80)
-         ⭐ Stars: 543 → 569 (avg 556, consistency 0.98)
+          🔧 HFR: 2.03 → 2.18 (avg 2.11)
+          📐 FWHM: 2.44 → 2.61 (avg 2.53)
+          ⭐ Stars: 543 → 569 (avg 556, consistency 0.98)
 
 📌 O Filter (10×600s, 1h 49m)
-   📈 Guide: 0.52″ 🟡Good
-   📋 Sub-sessions: 2
+📋 Sub-sessions: 2
      #1: 01:16→02:11 (1h 5m) | 6×600s
           📈 Guide: 0.47″ 🟡Good
-          🔧 HFR: 1.86 → 1.86 (avg 1.86)
-          📐 FWHM: 2.24 → 2.24 (avg 2.24)
-         ⭐ Stars: 634 → 643 (avg 638, consistency 1.00)
+          🔧 HFR: 1.87 → 2.21 (avg 2.05)
+          📐 FWHM: 2.25 → 2.65 (avg 2.46)
+          ⭐ Stars: 634 → 643 (avg 638, consistency 1.00)
      #2: 05:36→06:10 (44m) | 4×600s
           📈 Guide: 0.60″ 🟡Good
-          🔧 HFR: 1.92 → 1.92 (avg 1.92)
-          📐 FWHM: 2.30 → 2.30 (avg 2.30)
-         ⭐ Stars: 519 → 520 (avg 519, consistency 1.00)
-
+          🔧 HFR: 2.63 → 2.78 (avg 2.69)
+          📐 FWHM: 3.16 → 3.34 (avg 3.23)
+          ⭐ Stars: 519 → 520 (avg 519, consistency 1.00)
 
 🤖 **Analysis & Recommendations**
-🎉 Excellent conditions - great time for detailed imaging!
-==================================================
-
-📈 Generating session plot...
-✅ Session plot generated: ./plots/session_analysis_20250905_091844.png
-📨 Sending 3 messages to Discord...
-✅ Message 1/3 sent with plot.
-✅ Message 2/3 sent.
-✅ Message 3/3 sent.
-🎉 All 3 messages sent successfully!
+🚨 High HFR detected: 5.31 pixels (consider refocusing)
 ```
 
 ## 📋 Requirements
@@ -518,48 +408,9 @@ Add to your crontab for daily summary at 8 AM:
 
 ### Discord Message with Temporal Plot
 
-Here's an example of what gets sent to Discord, including both the comprehensive text summary and temporal visualization:
+Here's an example of what gets sent to Discord, including both the comprehensive text summary and temporal visualization from a real NGC 7380 session:
 
 ![Latest Session Plot](latest_session_plot.png)
-
-**Example Discord Message:**
-```
-🔭 Ekos Session Summary
-📅 2025-09-04 07:49 UTC
-
-🌙 Session Overview
-📸 Total Captures: 7
-⏰ Duration: 07:00 → 08:38 (1h 38m)
-🎯 Objects: 1 | 🔍 Filters: 3 (H, O, S)
-
-🌟 Guiding Performance
-📊 Measurements: 22
-🎯 Avg Error: 1.21″
-🟡 Guide Quality: Good
-📈 RA: 0.95″ | DEC: 0.74″
-
-📊 Capture Details
-
-🎯 NGC 7380
-📌 H Filter (4×600s, 58m)
-   🔧 HFR: 2.75 → 4.10 (avg 3.42, σ 0.67)
-   📐 FWHM: 6.46 → 9.63 (avg 8.05, σ 1.59)
-   ⭐ Stars: 244 → 250 (avg 247, consistency 0.99)
-   📈 Guide: 1.19″ 🟡Good
-
-📌 O Filter (2×600s, 20m)
-   🔧 HFR: 2.25 → 2.25 (avg 2.25, σ 0.00)
-   📐 FWHM: 5.29 → 5.29 (avg 5.29, σ 0.00)
-   ⭐ Stars: 247 → 248 (avg 248, consistency 1.00)
-   📈 Guide: 1.24″ 🟡Good
-
-🎯 Autofocus Summary
-🔄 Sessions: 3
-📈 Focus Stability: Good
-
-⚠️ Issues & Alerts
-❌ Aborted Captures: 4
-```
 
 The temporal plot shows:
 - **🔧 HFR Evolution**: Focus quality changes over time with autofocus events marked
