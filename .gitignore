@@ -66,3 +66,4 @@ test_*.py
 *_test.py
 
 plots/*
+analyze_ekos

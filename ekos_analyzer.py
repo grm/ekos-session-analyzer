@@ -35,7 +35,7 @@ class EkosAnalyzer:
                         f"Average < {self.guide_quality_thresholds['average_px']:.1f}px")
         
     def find_analyze_files(self, hours: int = 24) -> List[str]:
-        """Find .analyze files within the specified time window."""
+        """Find .analyze files within the specified time window based on actual session start times."""
         if not os.path.exists(self.analyze_dir):
             logging.warning(f"Analyze directory not found: {self.analyze_dir}")
             return []
@@ -48,27 +48,64 @@ class EkosAnalyzer:
         
         for filepath in glob.glob(pattern):
             try:
-                # Extract timestamp from filename: ekos-2025-02-28T23-22-19.analyze
-                filename = os.path.basename(filepath)
-                match = re.match(r'ekos-(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})\.analyze', filename)
-                if match:
-                    timestamp_str = match.group(1)
-                    # Replace only time part dashes with colons, keep date dashes intact
-                    # Split by 'T' to separate date and time parts
-                    date_part, time_part = timestamp_str.split('T')
-                    time_part = time_part.replace('-', ':')  # Only fix time format
-                    timestamp_str = f"{date_part} {time_part}"
-                    file_time = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
-                    
-                    if file_time >= cutoff:
+                # First, try to get the actual session start time from inside the file
+                session_start_time = self._get_session_start_from_file(filepath)
+                
+                if session_start_time:
+                    # Use the actual session start time for filtering
+                    if session_start_time >= cutoff:
                         analyze_files.append(filepath)
-                        logging.debug(f"Found analyze file: {filepath} ({file_time})")
+                        logging.debug(f"Found analyze file with session at {session_start_time}: {filepath}")
+                else:
+                    # Fallback to filename timestamp if we can't parse session start
+                    filename = os.path.basename(filepath)
+                    match = re.match(r'ekos-(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})\.analyze', filename)
+                    if match:
+                        timestamp_str = match.group(1)
+                        # Replace only time part dashes with colons, keep date dashes intact
+                        date_part, time_part = timestamp_str.split('T')
+                        time_part = time_part.replace('-', ':')  # Only fix time format
+                        timestamp_str = f"{date_part} {time_part}"
+                        file_time = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+                        
+                        if file_time >= cutoff:
+                            analyze_files.append(filepath)
+                            logging.debug(f"Found analyze file (fallback to filename timestamp): {filepath} ({file_time})")
                         
             except Exception as e:
-                logging.debug(f"Error parsing filename {filepath}: {e}")
+                logging.debug(f"Error parsing file {filepath}: {e}")
                 continue
                 
         return sorted(analyze_files)
+    
+    def _get_session_start_from_file(self, filepath: str) -> Optional[datetime]:
+        """Extract the actual session start time from inside an analyze file."""
+        try:
+            with open(filepath, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith('AnalyzeStartTime,'):
+                        parts = line.split(',')
+                        if len(parts) >= 2:
+                            datetime_str = parts[1]
+                            # Remove microseconds if present for parsing
+                            if '.' in datetime_str:
+                                datetime_str = datetime_str.split('.')[0]
+                            
+                            # Try parsing with different formats
+                            try:
+                                return datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S')
+                            except ValueError:
+                                try:
+                                    return datetime.strptime(datetime_str, '%Y-%m-%dT%H:%M:%S')
+                                except ValueError:
+                                    logging.debug(f"Could not parse session start time: {datetime_str}")
+                                    return None
+        except Exception as e:
+            logging.debug(f"Error reading file {filepath}: {e}")
+            return None
+        
+        return None
     
     def parse_analyze_file(self, filepath: str) -> Dict[str, Any]:
         """Parse a single .analyze file and extract session data with enhanced HFR/FWHM extraction."""

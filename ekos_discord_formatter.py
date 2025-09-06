@@ -377,23 +377,10 @@ def _generate_detailed_report_fragments(ekos_data: Dict[str, Any], advanced_metr
     # Fragment 3: DETAILED SUB-SESSIONS & TECHNICAL ANALYSIS
     fragment3_lines = [f"**🔬 Detailed Sub-Sessions (3/3)**\n"]
     
-    # Detailed filter analysis with sub-sessions
-    filter_analysis_summary = generate_filter_analysis_summary(ekos_data.get('filter_analysis', {}))
-    if filter_analysis_summary:
-        # Extract only the detailed sub-session information
-        lines = filter_analysis_summary.split('\n')
-        in_subsession = False
-        for line in lines:
-            if line.strip().startswith('#') or in_subsession:  # Sub-session details
-                fragment3_lines.append(line)
-                in_subsession = True
-            elif line.strip().startswith('📌') and in_subsession:  # New filter
-                fragment3_lines.append("")
-                fragment3_lines.append(line)
-                in_subsession = False
-            elif line.strip().startswith('📋 Sub-sessions:'):
-                fragment3_lines.append(line)
-                in_subsession = True
+    # Detailed capture analysis (same as message 2 but with sub-session details)
+    detailed_capture_lines = _format_capture_details(ekos_data, 'detailed')
+    if detailed_capture_lines:
+        fragment3_lines.extend(detailed_capture_lines)
     
     # Temperature correlation analysis
     if advanced_metrics.get('temperature_analysis'):
