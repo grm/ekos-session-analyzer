@@ -182,7 +182,7 @@ def _generate_standard_report(ekos_data: Dict[str, Any], advanced_metrics: Dict[
                 messages.append(first_message)
             
             # Filter analysis messages (split intelligently between filters)
-            filter_messages = split_filter_analysis_intelligently(filter_analysis)
+            filter_messages = split_filter_analysis_intelligently(filter_analysis, ekos_data.get('capture_summary', {}))
             messages.extend(filter_messages)
             
             # Final message: Footer content
@@ -377,10 +377,17 @@ def _generate_detailed_report_fragments(ekos_data: Dict[str, Any], advanced_metr
     # Fragment 3: DETAILED SUB-SESSIONS & TECHNICAL ANALYSIS
     fragment3_lines = [f"**🔬 Detailed Sub-Sessions (3/3)**\n"]
     
-    # Detailed capture analysis (same as message 2 but with sub-session details)
-    detailed_capture_lines = _format_capture_details(ekos_data, 'detailed')
-    if detailed_capture_lines:
-        fragment3_lines.extend(detailed_capture_lines)
+    # Show detailed filter analysis with sub-sessions breakdown
+    filter_analysis = ekos_data.get('filter_analysis', {})
+    if filter_analysis:
+        filter_summary = generate_filter_analysis_summary(filter_analysis, ekos_data.get('capture_summary', {}))
+        if filter_summary:
+            fragment3_lines.append(filter_summary)
+    else:
+        # Fallback to basic capture details if no filter analysis available
+        detailed_capture_lines = _format_capture_details(ekos_data, 'detailed')
+        if detailed_capture_lines:
+            fragment3_lines.extend(detailed_capture_lines)
     
     # Temperature correlation analysis
     if advanced_metrics.get('temperature_analysis'):
@@ -842,7 +849,7 @@ def generate_filter_analysis_blocks(filter_analysis: Dict[str, Any], capture_sum
                         sub_stars_avg = np.mean(sub_stars)
                         sub_stars_consistency = 1 - (np.std(sub_stars) / max(np.mean(sub_stars), 1))
                         
-                        object_lines.append(f"         ⭐ Stars: {sub_stars_min} → {sub_stars_max} (avg {sub_stars_avg:.0f}, consistency {sub_stars_consistency:.2f})")
+                        object_lines.append(f"          ⭐ Stars: {sub_stars_min} → {sub_stars_max} (avg {sub_stars_avg:.0f}, consistency {sub_stars_consistency:.2f})")
                     else:
                         object_lines.append(f"         ⭐ Stars: Data not available")
                 else:
@@ -878,9 +885,9 @@ def generate_filter_analysis_summary(filter_analysis: Dict[str, Any], capture_su
     
     return "\n".join(lines)
 
-def split_filter_analysis_intelligently(filter_analysis: Dict[str, Any], header: str = "📊 **Capture Details**") -> List[str]:
+def split_filter_analysis_intelligently(filter_analysis: Dict[str, Any], capture_summary: Dict = None, header: str = "📊 **Capture Details**") -> List[str]:
     """Split filter analysis into multiple messages, cutting cleanly between objects/filters."""
-    blocks = generate_filter_analysis_blocks(filter_analysis)
+    blocks = generate_filter_analysis_blocks(filter_analysis, capture_summary)
     if not blocks:
         return [f"{header}\n\nNo filter data available."]
     
