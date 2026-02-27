@@ -770,7 +770,9 @@ def generate_filter_analysis_blocks(filter_analysis: Dict[str, Any], capture_sum
                     hfr_std = np.std(hfrs)
                     
                     object_lines.append(f"   🔧 HFR: {hfr_min:.2f} → {hfr_max:.2f} (avg {hfr_avg:.2f}, σ {hfr_std:.2f})")
-                    object_lines.append(f"   📐 FWHM: {hfr_min*2.35:.2f} → {hfr_max*2.35:.2f} (avg {hfr_avg*2.35:.2f}, σ {hfr_std*2.35:.2f})")
+                    # FWHM ≈ HFR × 1.2 (consistent with ekos_analyzer._calculate_fwhm_from_hfr)
+                    fwhm_factor = 1.2
+                    object_lines.append(f"   📐 FWHM: {hfr_min*fwhm_factor:.2f} → {hfr_max*fwhm_factor:.2f} (avg {hfr_avg*fwhm_factor:.2f}, σ {hfr_std*fwhm_factor:.2f})")
                 
                 # Stars statistics
                 stars = [c['stars'] for c in filter_captures if c.get('stars') is not None and c['stars'] > 0]
@@ -1237,8 +1239,8 @@ def _format_capture_details(ekos_data: Dict[str, Any], detail_level: str = 'basi
         if has_quality_data:
             # Normal session with quality data
             if hfrs:
-                # Calculate FWHM from HFR (FWHM ≈ HFR × 2.35 for Gaussian PSF)
-                fwhms = [hfr * 2.35 for hfr in hfrs]
+                # Calculate FWHM from HFR (FWHM ≈ HFR × 1.2, consistent with ekos_analyzer)
+                fwhms = [hfr * 1.2 for hfr in hfrs]
                 
                 if detail_level == 'basic':
                     lines.append(f"   🔧 HFR: {min(hfrs):.2f} → {max(hfrs):.2f} (avg {np.mean(hfrs):.2f})")

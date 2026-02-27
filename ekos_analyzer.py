@@ -210,13 +210,30 @@ class EkosAnalyzer:
                         except (ValueError, IndexError):
                             pass
                         
-                        # Parse stars count - at index 7 based on actual Ekos format
+                        # Parse numStars at index 6, median at index 7, eccentricity at index 8
+                        # Format: CaptureComplete,time,exposure,filter,hfr,filename,numStars,median,eccentricity
                         stars_value = None
+                        median_value = None
+                        eccentricity_value = None
+                        if len(parts) > 6:
+                            try:
+                                stars_candidate = int(parts[6])
+                                if stars_candidate > 0:
+                                    stars_value = stars_candidate
+                            except (ValueError, IndexError):
+                                pass
                         if len(parts) > 7:
                             try:
-                                stars_candidate = int(parts[7])
-                                if stars_candidate > 0:  # Valid star count
-                                    stars_value = stars_candidate
+                                median_candidate = int(parts[7])
+                                if median_candidate > 0:
+                                    median_value = median_candidate
+                            except (ValueError, IndexError):
+                                pass
+                        if len(parts) > 8:
+                            try:
+                                ecc_candidate = float(parts[8])
+                                if ecc_candidate > 0:
+                                    eccentricity_value = ecc_candidate
                             except (ValueError, IndexError):
                                 pass
                         
@@ -225,9 +242,11 @@ class EkosAnalyzer:
                             'event': 'complete',
                             'exposure': float(parts[2]),
                             'filter': parts[3],
-                            'hfr': hfr_value,  # Use actual HFR from capture
+                            'hfr': hfr_value,
                             'fwhm': self._calculate_fwhm_from_hfr(hfr_value) if hfr_value else None,
                             'stars': stars_value,
+                            'median': median_value,
+                            'eccentricity': eccentricity_value,
                             'filepath': parts[5] if len(parts) > 5 else None
                         }
                         session_data['captures'].append(capture_data)
