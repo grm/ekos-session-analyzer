@@ -652,11 +652,14 @@ class EkosAnalyzer:
             completed_captures = [c for c in session['captures'] if c['event'] == 'complete']
             all_captures.extend(completed_captures)
             
-            # Extract object name for this session
-            obj_name = self._get_object_name_from_scheduler(session['scheduler_jobs']) or self._extract_object_name(session['filepath'])
-            
-            # Group captures by filter within this session for detailed analysis
+            # Group captures by (object, filter) using per-capture scheduler association
+            # This correctly assigns each capture to the scheduler job that was active
+            # at the time of capture, not just the latest job in the session.
+            fallback_name = self._extract_object_name(session['filepath'])
             for capture in completed_captures:
+                obj_name = self._get_object_name_for_capture(
+                    capture['timestamp'], session['scheduler_jobs']
+                ) or fallback_name
                 key = (obj_name, capture['filter'])
                 aggregated['capture_summary'][key].append(capture)
             
@@ -1063,7 +1066,7 @@ class EkosAnalyzer:
                 return "Poor"
     
     def _get_object_name_from_scheduler(self, scheduler_jobs: List[Dict]) -> str:
-        """Extract object name from scheduler job data."""
+        """Extract object name from scheduler job data (returns latest job - legacy fallback)."""
         if not scheduler_jobs:
             return None
             
@@ -1075,6 +1078,38 @@ class EkosAnalyzer:
             return latest_job.get('object_name', 'Unknown')
         
         return None
+
+    def _get_object_name_for_capture(self, capture_timestamp: float, scheduler_jobs: List[Dict]) -> str:
+        """Get the correct object name for a capture based on its timestamp.
+        
+        Finds which scheduler job was active when the capture was taken by looking
+        at the most recent SchedulerJobStart before the capture timestamp.
+        """
+        if not scheduler_jobs:
+            return None
+        
+        # Get all job start events sorted by timestamp
+        started_jobs = sorted(
+            [job for job in scheduler_jobs if job['event'] == 'start'],
+            key=lambda x: x['timestamp']
+        )
+        
+        if not started_jobs:
+            return None
+        
+        # Find the most recent job start that is before (or at) the capture timestamp
+        active_job = None
+        for job in started_jobs:
+            if job['timestamp'] <= capture_timestamp:
+                active_job = job
+            else:
+                break  # Jobs are sorted, no need to continue
+        
+        if active_job:
+            return active_job.get('object_name', 'Unknown')
+        
+        # If capture is before any job start, use the first job
+        return started_jobs[0].get('object_name', 'Unknown')
     
     def _extract_object_name(self, filepath: str) -> str:
         """Extract object name from filepath or return generic name."""

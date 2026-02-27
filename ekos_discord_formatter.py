@@ -670,17 +670,20 @@ def generate_filter_analysis_blocks(filter_analysis: Dict[str, Any], capture_sum
     # First, group filters by object
     objects_data = {}
     
+    # Build a mapping from filter_name -> object_name using capture_summary keys
+    # capture_summary has keys like (object_name, filter_name)
+    filter_to_object = {}
+    for key in capture_summary.keys():
+        if isinstance(key, tuple) and len(key) == 2:
+            obj_name, filt_name = key
+            filter_to_object[filt_name] = obj_name
+
     for filter_name, analysis in filter_analysis.items():
         if analysis.get('total_captures', 0) == 0:
             continue
         
-        # Extract object name from sub-sessions or use default
-        object_name = "NGC 7380"  # Default object
-        sub_sessions = analysis.get('sub_sessions', [])
-        if sub_sessions:
-            # Try to get object name from first sub-session if available
-            first_sub = sub_sessions[0]
-            object_name = first_sub.get('object_name', 'NGC 7380')
+        # Get object name from capture_summary mapping
+        object_name = filter_to_object.get(filter_name, "Unknown")
         
         # Group by object
         if object_name not in objects_data:
