@@ -53,7 +53,7 @@ class RealtimeDiscordNotifier:
 
     def notify_session_start(self, start_time: str, timezone: str):
         """Notify that a new Ekos session has started."""
-        msg = f"🌙 {self._prefix()}Nouvelle session Ekos démarrée\n"
+        msg = f"🌙 {self._prefix()}New Ekos session started\n"
         msg += f"🕐 {start_time} {timezone}"
         self.send_raw(msg)
 
@@ -63,22 +63,30 @@ class RealtimeDiscordNotifier:
         captures_fail = stats.get('captures_aborted', 0)
         af_ok = stats.get('autofocus_success', 0)
         af_fail = stats.get('autofocus_failed', 0)
+        align_ok = stats.get('align_success', 0)
+        align_fail = stats.get('align_failed', 0)
         jobs = stats.get('scheduler_jobs', [])
 
-        msg = f"🌅 {self._prefix()}Session terminée\n"
+        msg = f"🌅 {self._prefix()}Session ended\n"
 
         if jobs:
-            msg += f"🎯 Cibles : {', '.join(jobs)}\n"
+            msg += f"🎯 Targets: {', '.join(jobs)}\n"
 
-        msg += f"📸 Captures : {captures_ok} ✅"
+        msg += f"📸 Captures: {captures_ok} ✅"
         if captures_fail > 0:
             msg += f" / {captures_fail} ❌"
         msg += "\n"
 
         if af_ok > 0 or af_fail > 0:
-            msg += f"🔭 Autofocus : {af_ok} ✅"
+            msg += f"🔭 Autofocus: {af_ok} ✅"
             if af_fail > 0:
                 msg += f" / {af_fail} ❌"
+            msg += "\n"
+
+        if align_ok > 0 or align_fail > 0:
+            msg += f"🎯 Plate solving: {align_ok} ✅"
+            if align_fail > 0:
+                msg += f" / {align_fail} ❌"
             msg += "\n"
 
         self.send_raw(msg)
@@ -100,8 +108,8 @@ class RealtimeDiscordNotifier:
         msg += "\n"
 
         details = []
-        details.append(f"Filtre: **{filt}**")
-        details.append(f"Expo: {exposure:.0f}s")
+        details.append(f"Filter: **{filt}**")
+        details.append(f"Exp: {exposure:.0f}s")
         if hfr > 0:
             details.append(f"HFR: {hfr:.2f}")
         if num_stars > 0:
@@ -118,17 +126,17 @@ class RealtimeDiscordNotifier:
         exposure = event.get('exposure', 0)
         clock = event.get('clock_time', '')
 
-        msg = f"❌ {self._prefix()}Capture avortée"
+        msg = f"❌ {self._prefix()}Capture aborted"
         if obj:
             msg += f" — {obj}"
         msg += "\n"
 
         details = []
         if filt:
-            details.append(f"Filtre: **{filt}**")
-        details.append(f"Expo: {exposure:.0f}s")
+            details.append(f"Filter: **{filt}**")
+        details.append(f"Exp: {exposure:.0f}s")
         details.append(f"🕐 {clock}")
-        details.append(f"Total avortées: {abort_number}")
+        details.append(f"Total aborted: {abort_number}")
 
         msg += " · ".join(details)
         self.send_raw(msg)
@@ -148,12 +156,12 @@ class RealtimeDiscordNotifier:
 
         details = []
         if filt:
-            details.append(f"Filtre: **{filt}**")
+            details.append(f"Filter: **{filt}**")
         if position:
             details.append(f"Position: {position}")
         if r_squared:
             details.append(f"R²={r_squared}")
-        details.append(f"Durée: {duration:.0f}s")
+        details.append(f"Duration: {duration:.0f}s")
         if temperature:
             details.append(f"🌡️ {temperature:.1f}°C")
         details.append(f"🕐 {clock}")
@@ -167,12 +175,12 @@ class RealtimeDiscordNotifier:
         duration = event.get('duration', 0)
         clock = event.get('clock_time', '')
 
-        msg = f"🔭 {self._prefix()}Autofocus ❌ ÉCHOUÉ\n"
+        msg = f"🔭 {self._prefix()}Autofocus ❌ FAILED\n"
 
         details = []
         if filt:
-            details.append(f"Filtre: **{filt}**")
-        details.append(f"Durée: {duration:.0f}s")
+            details.append(f"Filter: **{filt}**")
+        details.append(f"Duration: {duration:.0f}s")
         details.append(f"🕐 {clock}")
 
         msg += " · ".join(details)
@@ -185,7 +193,7 @@ class RealtimeDiscordNotifier:
         job_name = event.get('job_name', 'Unknown')
         clock = event.get('clock_time', '')
 
-        msg = f"📋 {self._prefix()}Job démarré : **{job_name}**"
+        msg = f"📋 {self._prefix()}Job started: **{job_name}**"
         if clock:
             msg += f" · 🕐 {clock}"
         self.send_raw(msg)
@@ -196,9 +204,9 @@ class RealtimeDiscordNotifier:
         reason = event.get('reason', '')
         clock = event.get('clock_time', '')
 
-        msg = f"📋 {self._prefix()}Job terminé : **{job_name}**\n"
+        msg = f"📋 {self._prefix()}Job ended: **{job_name}**\n"
         if reason:
-            msg += f"💬 Raison : {reason}"
+            msg += f"💬 Reason: {reason}"
         if clock:
             msg += f" · 🕐 {clock}"
         self.send_raw(msg)
@@ -220,7 +228,7 @@ class RealtimeDiscordNotifier:
         else:
             emoji = "🧭"
 
-        msg = f"{emoji} {self._prefix()}Guidage : {message}"
+        msg = f"{emoji} {self._prefix()}Guiding: {message}"
         if clock:
             msg += f" · 🕐 {clock}"
         self.send_raw(msg)
@@ -228,26 +236,44 @@ class RealtimeDiscordNotifier:
     # --- Align Events ---
 
     def notify_align_complete(self, event: Dict[str, Any]):
-        duration = event.get("duration", 0)
-        clock = event.get("clock_time", "")
+        """Notify a successful plate solving / alignment."""
+        duration = event.get('duration', 0)
+        clock = event.get('clock_time', '')
 
-        msg = f"\U0001f3af {self._prefix()}Alignement \u2705 Plate solving r\u00e9ussi\n"
+        msg = f"🎯 {self._prefix()}Plate solving ✅ Alignment successful\n"
         details = []
-        details.append(f"Dur\u00e9e: {duration:.0f}s")
-        details.append(f"\U0001f550 {clock}")
-        msg += " \u00b7 ".join(details)
+        details.append(f"Duration: {duration:.0f}s")
+        details.append(f"🕐 {clock}")
+        msg += " · ".join(details)
         self.send_raw(msg)
 
     def notify_align_failed(self, event: Dict[str, Any]):
-        duration = event.get("duration", 0)
-        state = event.get("state", "Failed")
-        clock = event.get("clock_time", "")
+        """Notify a failed plate solving / alignment."""
+        duration = event.get('duration', 0)
+        state = event.get('state', 'Failed')
+        clock = event.get('clock_time', '')
 
-        msg = f"\U0001f3af {self._prefix()}Alignement \u274c Plate solving \u00c9CHOU\u00c9 ({state})\n"
+        msg = f"🎯 {self._prefix()}Plate solving ❌ Alignment FAILED ({state})\n"
         details = []
-        details.append(f"Dur\u00e9e: {duration:.0f}s")
-        details.append(f"\U0001f550 {clock}")
-        msg += " \u00b7 ".join(details)
+        details.append(f"Duration: {duration:.0f}s")
+        details.append(f"🕐 {clock}")
+        msg += " · ".join(details)
+        self.send_raw(msg)
+
+    # --- Mount Events ---
+
+    def notify_mount_parking(self, event: Dict[str, Any]):
+        """Notify mount parking status."""
+        state = event.get('state', '')
+        clock = event.get('clock_time', '')
+
+        if state == 'Parking':
+            msg = f"🔄 {self._prefix()}Mount parking..."
+        else:
+            msg = f"✅ {self._prefix()}Mount parked"
+
+        if clock:
+            msg += f" · 🕐 {clock}"
         self.send_raw(msg)
 
     # --- Meridian Flip ---
@@ -258,9 +284,9 @@ class RealtimeDiscordNotifier:
         clock = event.get('clock_time', '')
 
         state_labels = {
-            'MOUNT_FLIP_RUNNING': '🔄 Meridian flip en cours...',
-            'MOUNT_FLIP_COMPLETED': '✅ Meridian flip terminé',
-            'MOUNT_FLIP_ERROR': '❌ Meridian flip ERREUR',
+            'MOUNT_FLIP_RUNNING': '🔄 Meridian flip in progress...',
+            'MOUNT_FLIP_COMPLETED': '✅ Meridian flip completed',
+            'MOUNT_FLIP_ERROR': '❌ Meridian flip ERROR',
         }
 
         label = state_labels.get(state, f"🔄 Meridian flip: {state}")

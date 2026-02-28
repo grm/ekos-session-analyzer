@@ -61,6 +61,9 @@ class RealtimeAnalyzeParser:
         self._align_in_progress: bool = False
         self._align_started_time: Optional[float] = None
 
+        # Mount state
+        self._mount_parking: bool = False
+
         # Scheduler state
         self._current_job: str = ""
 
@@ -133,6 +136,8 @@ class RealtimeAnalyzeParser:
             events.extend(self._handle_af_aborted(time_offset, parts))
         elif command == "GuideState" and len(parts) >= 3:
             events.extend(self._handle_guide_state(time_offset, parts[2].strip()))
+        elif command == "MountState" and len(parts) >= 3:
+            events.extend(self._handle_mount_state(time_offset, parts[2].strip()))
         elif command == "SchedulerJobStart" and len(parts) >= 3:
             events.extend(self._handle_scheduler_start(time_offset, parts[2].strip()))
         elif command == "SchedulerJobEnd" and len(parts) >= 4:
@@ -309,7 +314,7 @@ class RealtimeAnalyzeParser:
                     'time': time,
                     'clock_time': self._to_clock_time(time),
                     'duration': lost_duration,
-                    'message': f"Guidage rétabli après {lost_duration:.0f}s",
+                    'message': f"Guide recovered after {lost_duration:.0f}s",
                 })
 
             self._guiding_active = True
@@ -333,7 +338,7 @@ class RealtimeAnalyzeParser:
                     'clock_time': self._to_clock_time(time),
                     'count': len(self._reacquire_times),
                     'window': self.reacquire_alert_window,
-                    'message': f"{len(self._reacquire_times)} reacquiring en {self.reacquire_alert_window:.0f}s",
+                    'message': f"{len(self._reacquire_times)} reacquiring events in {self.reacquire_alert_window:.0f}s",
                 })
 
         elif state in ("Aborted", "Idle"):
@@ -354,7 +359,7 @@ class RealtimeAnalyzeParser:
                     'time': time,
                     'clock_time': self._to_clock_time(time),
                     'duration': lost_duration,
-                    'message': f"Guidage perdu depuis {lost_duration:.0f}s",
+                    'message': f"Guide lost for {lost_duration:.0f}s",
                 })
 
         elif state == "Dithering":
@@ -362,6 +367,38 @@ class RealtimeAnalyzeParser:
 
         elif state in ("Calibrating", "Looping", "Selecting star"):
             pass  # Normal startup states
+
+        return events
+
+    # --- Mount State ---
+
+    def _handle_mount_state(self, time: float, state: str) -> List[Dict[str, Any]]:
+        events = []
+
+        if state == "Parking":
+            if not self._mount_parking:
+                self._mount_parking = True
+                events.append({
+                    'type': 'mount_parking',
+                    'time': time,
+                    'clock_time': self._to_clock_time(time),
+                    'state': 'Parking',
+                })
+
+        elif state in ("Parked", "Idle"):
+            if self._mount_parking:
+                self._mount_parking = False
+                if state == "Parked":
+                    events.append({
+                        'type': 'mount_parking',
+                        'time': time,
+                        'clock_time': self._to_clock_time(time),
+                        'state': 'Parked',
+                    })
+
+        else:
+            # Reset parking flag on any other state (Slewing, Tracking, etc.)
+            self._mount_parking = False
 
         return events
 
