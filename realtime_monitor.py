@@ -226,10 +226,10 @@ class RealtimeMonitor:
             logger.info("No .analyze files found yet. Waiting...")
 
         # Send startup notification
-        startup_msg = "🟢 Moniteur temps réel démarré"
+        startup_msg = "🟢 Real-time monitor started"
         if self.observatory_name:
-            startup_msg = f"🟢 **[{self.observatory_name}]** Moniteur temps réel démarré"
-        startup_msg += f"\n📁 Surveillance: `{self.analyze_dir}`"
+            startup_msg = f"🟢 **[{self.observatory_name}]** Real-time monitor started"
+        startup_msg += f"\n📁 Watching: `{self.analyze_dir}`"
 
         try:
             self.notifier.send_raw(startup_msg)
@@ -270,9 +270,9 @@ class RealtimeMonitor:
         if self._session_active:
             self._end_session()
 
-        shutdown_msg = "🔴 Moniteur temps réel arrêté"
+        shutdown_msg = "🔴 Real-time monitor stopped"
         if self.observatory_name:
-            shutdown_msg = f"🔴 **[{self.observatory_name}]** Moniteur temps réel arrêté"
+            shutdown_msg = f"🔴 **[{self.observatory_name}]** Real-time monitor stopped"
 
         try:
             self.notifier.send_raw(shutdown_msg)
