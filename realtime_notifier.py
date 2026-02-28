@@ -18,6 +18,7 @@ class RealtimeDiscordNotifier:
         self.webhook_url = config.get('webhook', '')
         self.observatory_name = config.get('realtime', {}).get('observatory_name', '')
         self.min_message_interval = config.get('realtime', {}).get('min_message_interval', 1.0)
+        self.pixel_scale = config.get('imaging_setup', {}).get('pixel_scale_arcsec', 0.0)
         self._last_send_time = 0.0
 
         if not self.webhook_url:
@@ -94,12 +95,14 @@ class RealtimeDiscordNotifier:
     # --- Capture Events ---
 
     def notify_capture_complete(self, event: Dict[str, Any], capture_number: int):
-        """Notify a successful capture."""
+        """Notify a successful capture with image quality metrics."""
         obj = event.get('object_name', '')
         filt = event.get('filter', '?')
         exposure = event.get('exposure', 0)
         hfr = event.get('hfr', -1)
         num_stars = event.get('num_stars', 0)
+        eccentricity = event.get('eccentricity', -1)
+        median = event.get('median', 0)
         clock = event.get('clock_time', '')
 
         msg = f"📸 {self._prefix()}Capture #{capture_number} ✅"
@@ -107,16 +110,32 @@ class RealtimeDiscordNotifier:
             msg += f" — {obj}"
         msg += "\n"
 
-        details = []
-        details.append(f"Filter: **{filt}**")
-        details.append(f"Exp: {exposure:.0f}s")
-        if hfr > 0:
-            details.append(f"HFR: {hfr:.2f}")
-        if num_stars > 0:
-            details.append(f"⭐ {num_stars}")
-        details.append(f"🕐 {clock}")
+        # Line 1: filter, exposure, time
+        line1 = []
+        line1.append(f"Filter: **{filt}**")
+        line1.append(f"Exp: {exposure:.0f}s")
+        line1.append(f"🕐 {clock}")
+        msg += " · ".join(line1) + "\n"
 
-        msg += " · ".join(details)
+        # Line 2: image quality metrics
+        quality = []
+        if hfr > 0:
+            # Compute FWHM in arcsec if pixel scale is configured
+            if self.pixel_scale > 0:
+                fwhm_arcsec = hfr * 2.0 * self.pixel_scale
+                quality.append(f"HFR: {hfr:.2f} ({fwhm_arcsec:.1f}\")")
+            else:
+                quality.append(f"HFR: {hfr:.2f}")
+        if num_stars > 0:
+            quality.append(f"⭐ {num_stars}")
+        if eccentricity > 0:
+            quality.append(f"Ecc: {eccentricity:.2f}")
+        if median > 0:
+            quality.append(f"Sky: {median}")
+
+        if quality:
+            msg += " · ".join(quality)
+
         self.send_raw(msg)
 
     def notify_capture_aborted(self, event: Dict[str, Any], abort_number: int):
