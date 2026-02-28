@@ -221,6 +221,14 @@ class RealtimeAnalyzeParser:
         try:
             exposure = float(parts[2])
             self._capture_started_time = None
+
+            # Suppress abort notification if autofocus is in progress:
+            # Ekos automatically aborts the current capture when autofocus starts,
+            # then restarts it after. This is not a real failure.
+            if self._af_started_time is not None:
+                logger.debug(f"CaptureAborted at {time} suppressed (autofocus in progress)")
+                return []
+
             return [{
                 'type': 'capture_aborted',
                 'time': time,
