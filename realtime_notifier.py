@@ -233,6 +233,35 @@ class RealtimeDiscordNotifier:
             msg += f" · 🕐 {clock}"
         self.send_raw(msg)
 
+    # --- Guide Stats ---
+
+    def notify_guide_stats(self, event: Dict[str, Any]):
+        """Notify periodic guiding statistics summary."""
+        rms_total = event.get('rms_total', 0)
+        rms_ra = event.get('rms_ra', 0)
+        rms_dec = event.get('rms_dec', 0)
+        peak_ra = event.get('peak_ra', 0)
+        peak_dec = event.get('peak_dec', 0)
+        avg_snr = event.get('avg_snr', 0)
+        num_samples = event.get('num_samples', 0)
+        interval_minutes = event.get('interval_minutes', 10)
+        clock = event.get('clock_time', '')
+
+        msg = f"🧭 {self._prefix()}Guiding stats ({interval_minutes:.0f}min)\n"
+        msg += f"RMS: **{rms_total:.2f}\"** total · {rms_ra:.2f}\" RA · {rms_dec:.2f}\" DEC\n"
+        msg += f"Peak: {peak_ra:.2f}\" RA · {peak_dec:.2f}\" DEC"
+
+        details = []
+        if avg_snr > 0:
+            details.append(f"SNR: {avg_snr:.1f}")
+        details.append(f"{num_samples} samples")
+        details.append(f"🕐 {clock}")
+
+        if details:
+            msg += "\n" + " · ".join(details)
+
+        self.send_raw(msg)
+
     # --- Align Events ---
 
     def notify_align_complete(self, event: Dict[str, Any]):

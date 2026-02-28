@@ -102,12 +102,14 @@ class RealtimeMonitor:
         guide_lost_threshold = rt_config.get('guide_lost_threshold_seconds', 30.0)
         reacquire_alert_count = rt_config.get('reacquire_alert_count', 5)
         reacquire_alert_window = rt_config.get('reacquire_alert_window_seconds', 300.0)
+        guide_stats_interval = rt_config.get('guide_stats_interval_seconds', 600.0)
 
         self.watcher = AnalyzeFileWatcher(self.analyze_dir, self.poll_interval)
         self.parser = RealtimeAnalyzeParser(
             guide_lost_threshold=guide_lost_threshold,
             reacquire_alert_count=reacquire_alert_count,
             reacquire_alert_window=reacquire_alert_window,
+            guide_stats_interval=guide_stats_interval,
         )
         self.notifier = RealtimeDiscordNotifier(config)
 
@@ -193,6 +195,9 @@ class RealtimeMonitor:
 
             elif event_type == 'guide_problem':
                 self.notifier.notify_guide_problem(event)
+
+            elif event_type == 'guide_stats_summary':
+                self.notifier.notify_guide_stats(event)
 
             elif event_type == 'align_complete':
                 self._session_stats['align_success'] = self._session_stats.get('align_success', 0) + 1

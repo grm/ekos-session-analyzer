@@ -20,16 +20,18 @@ class RealtimeAnalyzeParser:
     """
 
     def __init__(self, guide_lost_threshold: float = 30.0, reacquire_alert_count: int = 5,
-                 reacquire_alert_window: float = 300.0):
+                 reacquire_alert_window: float = 300.0, guide_stats_interval: float = 600.0):
         """
         Args:
             guide_lost_threshold: Seconds of non-guiding before alerting
             reacquire_alert_count: Number of reacquiring events in window to trigger alert
             reacquire_alert_window: Time window (seconds) for reacquiring detection
+            guide_stats_interval: Seconds between periodic guide stats summaries (default 600 = 10min)
         """
         self.guide_lost_threshold = guide_lost_threshold
         self.reacquire_alert_count = reacquire_alert_count
         self.reacquire_alert_window = reacquire_alert_window
+        self.guide_stats_interval = guide_stats_interval
 
         self.reset()
 
@@ -56,6 +58,12 @@ class RealtimeAnalyzeParser:
         self._guide_lost_alerted: bool = False
         self._reacquire_times: List[float] = []
         self._reacquire_alerted_at: float = 0.0
+
+        # Guide stats accumulation
+        self._guide_stats_ra: List[float] = []
+        self._guide_stats_dec: List[float] = []
+        self._guide_stats_snr: List[float] = []
+        self._guide_stats_last_report: Optional[float] = None
 
         # Align state
         self._align_in_progress: bool = False
@@ -134,6 +142,8 @@ class RealtimeAnalyzeParser:
             events.extend(self._handle_af_complete(time_offset, parts))
         elif command == "AutofocusAborted" and len(parts) >= 4:
             events.extend(self._handle_af_aborted(time_offset, parts))
+        elif command == "GuideStats" and len(parts) >= 7:
+            events.extend(self._handle_guide_stats(time_offset, parts))
         elif command == "GuideState" and len(parts) >= 3:
             events.extend(self._handle_guide_state(time_offset, parts[2].strip()))
         elif command == "MountState" and len(parts) >= 3:
@@ -292,6 +302,64 @@ class RealtimeAnalyzeParser:
             'clock_time': self._to_clock_time(time),
             'filter': filter_name,
             'duration': duration,
+        }]
+
+    # --- Guide Stats ---
+
+    def _handle_guide_stats(self, time: float, parts: List[str]) -> List[Dict[str, Any]]:
+        """
+        Accumulate GuideStats samples and emit a summary every guide_stats_interval seconds.
+        Format: GuideStats, time, ra_error, dec_error, ra_pulse, dec_pulse, snr, sky_bg, num_stars
+        """
+        try:
+            ra_error = float(parts[2])
+            dec_error = float(parts[3])
+            snr = float(parts[6])
+        except (ValueError, IndexError):
+            return []
+
+        # Accumulate samples
+        self._guide_stats_ra.append(ra_error)
+        self._guide_stats_dec.append(dec_error)
+        self._guide_stats_snr.append(snr)
+
+        # Initialize last report time on first sample
+        if self._guide_stats_last_report is None:
+            self._guide_stats_last_report = time
+            return []
+
+        # Check if it's time to emit a summary
+        if time - self._guide_stats_last_report < self.guide_stats_interval:
+            return []
+
+        # Compute RMS RA, RMS DEC, RMS total
+        n = len(self._guide_stats_ra)
+        rms_ra = (sum(x * x for x in self._guide_stats_ra) / n) ** 0.5
+        rms_dec = (sum(x * x for x in self._guide_stats_dec) / n) ** 0.5
+        rms_total = (rms_ra ** 2 + rms_dec ** 2) ** 0.5
+        peak_ra = max(abs(x) for x in self._guide_stats_ra)
+        peak_dec = max(abs(x) for x in self._guide_stats_dec)
+        avg_snr = sum(self._guide_stats_snr) / n
+        interval_minutes = (time - self._guide_stats_last_report) / 60.0
+
+        # Reset accumulators
+        self._guide_stats_ra = []
+        self._guide_stats_dec = []
+        self._guide_stats_snr = []
+        self._guide_stats_last_report = time
+
+        return [{
+            'type': 'guide_stats_summary',
+            'time': time,
+            'clock_time': self._to_clock_time(time),
+            'rms_ra': rms_ra,
+            'rms_dec': rms_dec,
+            'rms_total': rms_total,
+            'peak_ra': peak_ra,
+            'peak_dec': peak_dec,
+            'avg_snr': avg_snr,
+            'num_samples': n,
+            'interval_minutes': interval_minutes,
         }]
 
     # --- Guide State ---
