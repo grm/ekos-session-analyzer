@@ -225,6 +225,31 @@ class RealtimeDiscordNotifier:
             msg += f" · 🕐 {clock}"
         self.send_raw(msg)
 
+    # --- Align Events ---
+
+    def notify_align_complete(self, event: Dict[str, Any]):
+        duration = event.get("duration", 0)
+        clock = event.get("clock_time", "")
+
+        msg = f"\U0001f3af {self._prefix()}Alignement \u2705 Plate solving r\u00e9ussi\n"
+        details = []
+        details.append(f"Dur\u00e9e: {duration:.0f}s")
+        details.append(f"\U0001f550 {clock}")
+        msg += " \u00b7 ".join(details)
+        self.send_raw(msg)
+
+    def notify_align_failed(self, event: Dict[str, Any]):
+        duration = event.get("duration", 0)
+        state = event.get("state", "Failed")
+        clock = event.get("clock_time", "")
+
+        msg = f"\U0001f3af {self._prefix()}Alignement \u274c Plate solving \u00c9CHOU\u00c9 ({state})\n"
+        details = []
+        details.append(f"Dur\u00e9e: {duration:.0f}s")
+        details.append(f"\U0001f550 {clock}")
+        msg += " \u00b7 ".join(details)
+        self.send_raw(msg)
+
     # --- Meridian Flip ---
 
     def notify_meridian_flip(self, event: Dict[str, Any]):

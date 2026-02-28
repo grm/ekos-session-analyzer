@@ -194,6 +194,14 @@ class RealtimeMonitor:
             elif event_type == 'guide_problem':
                 self.notifier.notify_guide_problem(event)
 
+            elif event_type == 'align_complete':
+                self._session_stats['align_success'] = self._session_stats.get('align_success', 0) + 1
+                self.notifier.notify_align_complete(event)
+
+            elif event_type == 'align_failed':
+                self._session_stats['align_failed'] = self._session_stats.get('align_failed', 0) + 1
+                self.notifier.notify_align_failed(event)
+
             elif event_type == 'meridian_flip':
                 self.notifier.notify_meridian_flip(event)
 

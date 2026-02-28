@@ -57,6 +57,10 @@ class RealtimeAnalyzeParser:
         self._reacquire_times: List[float] = []
         self._reacquire_alerted_at: float = 0.0
 
+        # Align state
+        self._align_in_progress: bool = False
+        self._align_started_time: Optional[float] = None
+
         # Scheduler state
         self._current_job: str = ""
 
@@ -134,6 +138,8 @@ class RealtimeAnalyzeParser:
         elif command == "SchedulerJobEnd" and len(parts) >= 4:
             reason = parts[3].strip() if len(parts) > 3 else ""
             events.extend(self._handle_scheduler_end(time_offset, parts[2].strip(), reason))
+        elif command == "AlignState" and len(parts) >= 3:
+            events.extend(self._handle_align_state(time_offset, parts[2].strip()))
         elif command == "MeridianFlipState" and len(parts) >= 3:
             events.extend(self._handle_meridian_flip(time_offset, parts[2].strip()))
 
@@ -379,6 +385,43 @@ class RealtimeAnalyzeParser:
             'job_name': job_name,
             'reason': reason,
         }]
+
+    # --- Align State ---
+
+    def _handle_align_state(self, time: float, state: str) -> List[Dict[str, Any]]:
+        events = []
+
+        if state == "In Progress":
+            if not self._align_in_progress:
+                self._align_in_progress = True
+                self._align_started_time = time
+
+        elif state == "Complete":
+            if self._align_in_progress:
+                duration = time - self._align_started_time if self._align_started_time else 0
+                self._align_in_progress = False
+                self._align_started_time = None
+                events.append({
+                    'type': 'align_complete',
+                    'time': time,
+                    'clock_time': self._to_clock_time(time),
+                    'duration': duration,
+                })
+
+        elif state in ("Failed", "Aborted"):
+            if self._align_in_progress:
+                duration = time - self._align_started_time if self._align_started_time else 0
+                self._align_in_progress = False
+                self._align_started_time = None
+                events.append({
+                    'type': 'align_failed',
+                    'time': time,
+                    'clock_time': self._to_clock_time(time),
+                    'duration': duration,
+                    'state': state,
+                })
+
+        return events
 
     # --- Meridian Flip ---
 
